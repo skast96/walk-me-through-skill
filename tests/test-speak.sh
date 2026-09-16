@@ -26,7 +26,8 @@ have_mpv=0;  command -v mpv      >/dev/null 2>&1 && have_mpv=1
 # Test 1: edge-tts missing -> exit 1, reason on stderr
 bin=$(mktemp -d)
 make_bin "$bin" "${base[@]}"
-[ $have_mpv -eq 1 ] && make_bin "$bin" mpv
+printf '#!/usr/bin/env bash\nexit 0\n' > "$bin/mpv"
+chmod +x "$bin/mpv"
 err=$(echo "hello" | PATH="$bin" bash "$speak" 2>&1 >/dev/null); rc=$?
 if [ $rc -ne 0 ] && [[ "$err" == *"edge-tts not found"* ]]; then
   pass "missing edge-tts exits non-zero with reason"

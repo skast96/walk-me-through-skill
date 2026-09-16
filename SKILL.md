@@ -21,7 +21,7 @@ cat <<'BRIEFING' | "${CLAUDE_SKILL_DIR}/speak.sh" docs/walk-me/<plan-basename>/<
 BRIEFING
 ```
 
-The script writes the mp3 to that path, keeps it, and blocks until playback ends. If the file already exists, the script plays it as is and ignores the text. That is how Repeat works without a second synthesis.
+The script writes the mp3 to that path, keeps it, and blocks until playback ends. If the file already exists and is not empty, the script plays it as is and ignores the text. That is how Repeat works without a second synthesis.
 
 If the script exits non-zero, audio is unavailable for this walkthrough. Then do three things:
 
@@ -33,12 +33,18 @@ If the script exits non-zero, audio is unavailable for this walkthrough. Then do
 
 Every walkthrough leaves its audio in the project so the user can listen again without Claude.
 
-- Folder: `docs/walk-me/<plan-basename>/`, relative to the project root. For `docs/superpowers/plans/2026-09-16-csv-export.md` that is `docs/walk-me/2026-09-16-csv-export/`.
-- Before the first section: remove that folder if it exists, then create it. A new walkthrough replaces the old audio.
+- Folder: `docs/walk-me/<plan-basename>/`, relative to the project root. The plan basename is the plan's file name with its directory and its `.md` extension stripped. For `docs/superpowers/plans/2026-09-16-csv-export.md` that is `docs/walk-me/2026-09-16-csv-export/`.
+- If the basename is empty or still contains a `/` or `..`, stop and ask the user for a folder name. Never remove anything outside `docs/walk-me/`.
+- Before the first section: remove that folder if it exists. Then create it. A new walkthrough replaces the old audio.
 - Before the first section: make sure the project's `.gitignore` contains a line `docs/walk-me/`. Append it if missing. Create `.gitignore` if the project has none. Say in text that you did so.
-- File names: a two digit number in playback order, a hyphen, then a short lowercase name of the section with hyphens between words. `01-overview.mp3`, `02-constraints.mp3`, `03-csv-formatter.mp3`. The last two are `NN-risks.mp3` and `NN-wrap-up.mp3`.
+- File names have three parts: a two digit number in playback order, a hyphen, and a short lowercase name of the section with hyphens between words. Examples in order:
+  - `01-overview.mp3`
+  - `02-constraints.mp3`
+  - `03-csv-formatter.mp3` and one more per task section
+  - `NN-risks.mp3`
+  - `NN-wrap-up.mp3`
 - A Go deeper briefing sits next to its section with a `b` suffix: `03b-csv-formatter-deeper.mp3`.
-- Transcript: `transcript.md` in the same folder. After each briefing append a heading with the mp3 file name and the briefing text below it. In text mode the transcript is still written.
+- Transcript: `transcript.md` in the same folder. After each briefing append a heading with the mp3 file name and the briefing text below it. In text mode the transcript is still written, with the file names the audio would have had.
 - At the end, tell the user the folder path in one line and that `mpv <folder>/` replays it in order.
 
 ## Procedure

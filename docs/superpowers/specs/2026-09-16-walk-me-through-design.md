@@ -148,19 +148,27 @@ There is no automatic offer after writing-plans and no matching on phrases.
 Every briefing is kept as an mp3 in the project so the user can replay the
 walkthrough with any player and without Claude.
 
-- Folder: `docs/walk-me/<plan-basename>/` relative to the project root.
-- Before the first section the skill removes an existing folder for that plan
-  and creates it fresh. A new walkthrough replaces the old audio.
+- Folder: `docs/walk-me/<plan-basename>/` relative to the project root. The
+  basename is the plan file name without directory and without `.md`.
+- If the basename is empty or contains `/` or `..`, the skill asks for a
+  folder name instead. It never removes anything outside `docs/walk-me/`.
+- Before the first section the skill removes an existing folder for that plan.
+  Then it creates the folder fresh. A new walkthrough replaces the old audio.
 - Before the first section the skill ensures the project's `.gitignore` has
   the line `docs/walk-me/`, creating the file if needed, and says so in text.
 - File names: two digit playback order, hyphen, short lowercase hyphenated
-  section name. `01-overview.mp3`, `02-constraints.mp3`, then one per task
-  section, then `NN-risks.mp3` and `NN-wrap-up.mp3`. A Go deeper briefing is
-  `NNb-<name>-deeper.mp3`.
+  section name. In order:
+  - `01-overview.mp3`
+  - `02-constraints.mp3`
+  - one file per task section
+  - `NN-risks.mp3`
+  - `NN-wrap-up.mp3`
+- A Go deeper briefing is `NNb-<name>-deeper.mp3`.
 - Repeat runs the same speak command. The file exists, so speak.sh replays it
   without synthesis.
 - `transcript.md` in the folder holds every briefing under a heading with its
-  file name. It is written in text mode too.
+  file name. It is written in text mode too, with the names the audio would
+  have had.
 - At the end the skill names the folder and the replay command
   `mpv <folder>/`.
 
