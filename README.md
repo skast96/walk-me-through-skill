@@ -39,7 +39,7 @@ Update later with `git pull` in that directory.
 
 ### What install.sh does
 
-- Reads which speech engine you configured. See Speech engine below. Default is edge-tts.
+- Reads which speech engine you configured. See Speech engine below. Default is the `edge` engine.
 - For edge-tts: checks that `uv` is available and installs `edge-tts` as a uv tool.
 - For Kokoro: checks that `curl` is available and that the Kokoro server answers.
 - Checks that `mpv` is available and names the package if not.

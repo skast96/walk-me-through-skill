@@ -177,7 +177,7 @@ fi
 rm -rf "$bin"
 
 # Test 10: kokoro chosen, server unreachable -> exit 1, reason names the URL, no edge-tts fallback.
-# The fake curl fails for every URL that is not on the fake server, so a wrong URL is unreachable.
+# The fake curl only answers http URLs, so an ftp URL plays the role of a server that is down.
 bin=$(mktemp -d); log=$(mktemp)
 make_bin "$bin" "${base[@]}"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$bin/mpv"; chmod +x "$bin/mpv"
@@ -192,20 +192,34 @@ fi
 rm -rf "$bin" "$log" "$log.body"
 
 # Test 11: kokoro success -> mp3 written, request carries voice, speed and escaped text. Fake curl and mpv.
+# The rate has a leading zero on purpose: it must become speed 1.08, not an octal error.
 bin=$(mktemp -d); log=$(mktemp); out=$(mktemp -d)
 make_bin "$bin" "${base[@]}" mkdir
 printf '#!/usr/bin/env bash\nexit 0\n' > "$bin/mpv"; chmod +x "$bin/mpv"
 make_curl "$bin" "$log"
-printf 'say "hi"\nthere\n' | WALK_ME_THROUGH_TTS=kokoro WALK_ME_THROUGH_RATE="+10%" WALK_ME_THROUGH_KOKORO_URL="http://fake:8880" PATH="$bin" bash "$speak" "$out/01-test.mp3" 2>"$log.err"; rc=$?
+printf 'say "hi"\nthere\n' | WALK_ME_THROUGH_TTS=kokoro WALK_ME_THROUGH_RATE="+08%" WALK_ME_THROUGH_KOKORO_URL="http://fake:8880" PATH="$bin" bash "$speak" "$out/01-test.mp3" 2>"$log.err"; rc=$?
 body=$(cat "$log.body" 2>/dev/null)
 if [ $rc -eq 0 ] && [ -s "$out/01-test.mp3" ] \
    && grep -q "http://fake:8880/health" "$log" \
-   && [[ "$body" == *'"voice":"af_heart"'* ]] && [[ "$body" == *'"speed":1.10'* ]] \
+   && [[ "$body" == *'"voice":"af_heart"'* ]] && [[ "$body" == *'"speed":1.08'* ]] \
    && [[ "$body" == *'"input":"say \"hi\"\nthere"'* ]]; then
   pass "kokoro writes the mp3 and sends voice, speed and escaped text"
 else
   fail "kokoro success: rc=$rc file=$([ -s "$out/01-test.mp3" ] && echo yes || echo no) body=$body stderr=$(cat "$log.err")"
 fi
 rm -rf "$bin" "$log" "$log.body" "$log.err" "$out"
+
+# Test 12: kokoro with a rate that is not a whole percent -> exit 1, reason names the variable, no request sent.
+bin=$(mktemp -d); log=$(mktemp)
+make_bin "$bin" "${base[@]}"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$bin/mpv"; chmod +x "$bin/mpv"
+make_curl "$bin" "$log"
+err=$(echo "hello" | WALK_ME_THROUGH_TTS=kokoro WALK_ME_THROUGH_RATE="+2.5%" WALK_ME_THROUGH_KOKORO_URL="http://fake:8880" PATH="$bin" bash "$speak" 2>&1 >/dev/null); rc=$?
+if [ $rc -ne 0 ] && [[ "$err" == *"Kokoro needs a whole percent"* ]] && [ ! -e "$log.body" ]; then
+  pass "kokoro rejects a rate that is not a whole percent"
+else
+  fail "kokoro bad rate: rc=$rc stderr=$err body_sent=$([ -e "$log.body" ] && echo yes || echo no)"
+fi
+rm -rf "$bin" "$log" "$log.body"
 
 exit $failed

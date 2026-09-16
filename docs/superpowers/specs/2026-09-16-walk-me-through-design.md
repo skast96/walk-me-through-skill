@@ -302,6 +302,9 @@ manual paths follow it for people who prefer to run the commands themselves.
   naming the URL, and a fake `edge-tts` on `PATH` is never run.
 - With kokoro chosen and a fake `curl` that answers, the mp3 is written and
   the request body carries the voice, the converted speed and the escaped text.
+  The rate in this test has a leading zero, so `+08%` must become `1.08`.
+- With kokoro chosen and a rate that is not a whole percent, exit non-zero
+  naming the variable, and no synthesis request is sent.
 
 `tests/test-install.sh`:
 

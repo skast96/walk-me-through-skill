@@ -59,11 +59,12 @@ synth_kokoro() {
   text=${text//$'\n'/\\n}
   text=${text//$'\r'/\\r}
   text=${text//$'\t'/\\t}
-  pct=${rate%\%}; pct=${pct#+}
-  if ! [[ "$pct" =~ ^-?[0-9]+$ ]]; then
+  # Sign, digits, percent. Leading zeros are dropped so bash does not read them as octal.
+  if ! [[ "$rate" =~ ^([+-]?)0*([0-9]+)%$ ]]; then
     echo "speak.sh: WALK_ME_THROUGH_RATE is '$rate'. Kokoro needs a whole percent such as +10%." >&2
     return 1
   fi
+  pct="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
   speed=$(( (100 + pct) / 100 )).$(printf '%02d' $(( (100 + pct) % 100 )))
   if ! err=$(curl -sfS --max-time 300 -X POST "$kokoro_url/v1/audio/speech" \
       -H 'Content-Type: application/json' \

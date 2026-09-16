@@ -8,7 +8,7 @@ install="$here/../install.sh"
 failed=0
 # The tests below assume the edge engine unless they set WALK_ME_THROUGH_TTS themselves.
 export WALK_ME_THROUGH_TTS=edge
-unset WALK_ME_THROUGH_KOKORO_URL
+unset WALK_ME_THROUGH_VOICE WALK_ME_THROUGH_RATE WALK_ME_THROUGH_KOKORO_URL
 
 pass() { echo "PASS: $1"; }
 fail() { echo "FAIL: $1"; failed=1; }
