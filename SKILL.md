@@ -74,18 +74,21 @@ Print the section list as a short numbered list before speaking, so the user kno
 
 For every section:
 
+Only an explicit Continue moves to the next section. Never move on after a comment, a clarification, or a summary of the discussion. Ask again instead.
+
 1. Write the briefing following the register rules below.
 2. Speak it into its numbered file and append it to the transcript.
 3. Ask with AskUserQuestion. Question: "Any thoughts on this part?" Options, in this order:
-   - **Continue** - next section.
+   - **Continue** - the user is finished with this section. Move to the next one.
    - **Repeat** - run the same speak command again. The file exists, so it is replayed. Then ask again.
    - **Go deeper** - write and speak a second briefing on the same section into its `b` file, up to 250 words, covering the individual steps, the interfaces, and what the tests check. Then ask again.
    - The built in Other field is where the user types comments.
 4. When the user types a comment:
    - Record it together with the section and the task it belongs to.
-   - If the comment could mean two different changes, ask one typed clarification before moving on. Do not speak the clarification.
+   - If the comment could mean two different changes, ask one typed clarification. Do not speak the clarification.
    - If it contradicts an earlier comment, ask which one wins.
-   - Then continue to the next section.
+   - Confirm in one or two text sentences what you recorded.
+   - Then ask the same question again. The user may have more to say about this section.
 
 ### 4. Wrap up
 

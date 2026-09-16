@@ -118,8 +118,10 @@ There is no automatic offer after writing-plans and no matching on phrases.
    - "Go deeper" speaks a second briefing about the same section with more
      detail on the steps and interfaces, then asks again.
    - A typed comment is recorded together with the section it belongs to.
-     If the comment is ambiguous, ask one typed clarification before moving
-     on. Then continue to the next section.
+     If the comment is ambiguous, ask one typed clarification. Then confirm
+     what was recorded and ask the same question again.
+   - Only an explicit Continue moves to the next section. A comment, a
+     clarification, or a summary never does.
 4. Wrap-up:
    - Speak a short summary of every change the user asked for. If there were
      none, say so and stop.
