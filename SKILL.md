@@ -13,19 +13,33 @@ This is not read-aloud. Never speak plan text verbatim. Write a spoken briefing 
 
 ## Speaking
 
-Speak a briefing by piping it into the speak script. Use a Bash timeout of 300000 so long sections finish:
+Speak a briefing by piping it into the speak script, with the file it should be saved as. Use a Bash timeout of 300000 so long sections finish:
 
 ```bash
-cat <<'BRIEFING' | "${CLAUDE_SKILL_DIR}/speak.sh"
+cat <<'BRIEFING' | "${CLAUDE_SKILL_DIR}/speak.sh" docs/walk-me/<plan-basename>/<NN-name>.mp3
 <briefing text>
 BRIEFING
 ```
 
-The script blocks until playback ends. If it exits non-zero, audio is unavailable for this walkthrough. Then do three things:
+The script writes the mp3 to that path, keeps it, and blocks until playback ends. If the file already exists, the script plays it as is and ignores the text. That is how Repeat works without a second synthesis.
+
+If the script exits non-zero, audio is unavailable for this walkthrough. Then do three things:
 
 - Print the briefing as text instead.
 - Tell the user once that audio is off, quoting the script's stderr line as the reason.
-- Continue in text mode for every remaining section. Do not retry audio.
+- Continue in text mode for every remaining section. Do not retry audio. Keep writing the transcript.
+
+## Saved audio
+
+Every walkthrough leaves its audio in the project so the user can listen again without Claude.
+
+- Folder: `docs/walk-me/<plan-basename>/`, relative to the project root. For `docs/superpowers/plans/2026-09-16-csv-export.md` that is `docs/walk-me/2026-09-16-csv-export/`.
+- Before the first section: remove that folder if it exists, then create it. A new walkthrough replaces the old audio.
+- Before the first section: make sure the project's `.gitignore` contains a line `docs/walk-me/`. Append it if missing. Create `.gitignore` if the project has none. Say in text that you did so.
+- File names: a two digit number in playback order, a hyphen, then a short lowercase name of the section with hyphens between words. `01-overview.mp3`, `02-constraints.mp3`, `03-csv-formatter.mp3`. The last two are `NN-risks.mp3` and `NN-wrap-up.mp3`.
+- A Go deeper briefing sits next to its section with a `b` suffix: `03b-csv-formatter-deeper.mp3`.
+- Transcript: `transcript.md` in the same folder. After each briefing append a heading with the mp3 file name and the briefing text below it. In text mode the transcript is still written.
+- At the end, tell the user the folder path in one line and that `mpv <folder>/` replays it in order.
 
 ## Procedure
 
@@ -55,11 +69,11 @@ Print the section list as a short numbered list before speaking, so the user kno
 For every section:
 
 1. Write the briefing following the register rules below.
-2. Speak it.
+2. Speak it into its numbered file and append it to the transcript.
 3. Ask with AskUserQuestion. Question: "Any thoughts on this part?" Options, in this order:
    - **Continue** - next section.
-   - **Repeat** - speak the same briefing again, then ask again.
-   - **Go deeper** - write and speak a second briefing on the same section, up to 250 words, covering the individual steps, the interfaces, and what the tests check. Then ask again.
+   - **Repeat** - run the same speak command again. The file exists, so it is replayed. Then ask again.
+   - **Go deeper** - write and speak a second briefing on the same section into its `b` file, up to 250 words, covering the individual steps, the interfaces, and what the tests check. Then ask again.
    - The built in Other field is where the user types comments.
 4. When the user types a comment:
    - Record it together with the section and the task it belongs to.
@@ -69,14 +83,14 @@ For every section:
 
 ### 4. Wrap up
 
-1. If there were no comments, speak one sentence saying so and stop.
-2. Otherwise write and speak a wrap up briefing: every change the user asked for, one sentence each, in plan order. Under 150 words.
+1. If there were no comments, speak one sentence saying so into the wrap up file, name the audio folder, and stop.
+2. Otherwise write and speak a wrap up briefing into the wrap up file: every change the user asked for, one sentence each, in plan order. Under 150 words.
 3. Edit the plan file:
    - Keep the writing-plans structure: task headers, Files, Interfaces, checkbox steps.
    - Change only the sections the user commented on.
    - A new task gets the same bite sized steps as its neighbours: failing test, run, implement, run, commit.
    - If a comment changes the design rather than the plan, apply the plan side and add a note in your text summary that the spec needs the same change. Never edit the spec.
-4. Print a text summary of what changed, section by section.
+4. Print a text summary of what changed, section by section, and name the audio folder.
 5. If a change invalidates other tasks, for example a removed interface that three later tasks consume, say so in text and recommend rerunning writing-plans instead of patching.
 
 ## Register rules for briefings

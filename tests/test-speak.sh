@@ -94,4 +94,33 @@ else
   skip "mpv failure test needs edge-tts installed"
 fi
 
+# Test 6: output path given -> mp3 written there, kept, temp dir empty. Audible. Needs network.
+if [ $have_edge -eq 1 ] && [ $have_mpv -eq 1 ]; then
+  tmp=$(mktemp -d); out=$(mktemp -d)
+  echo "Saved audio test." | TMPDIR="$tmp" bash "$speak" "$out/sub/01-test.mp3"; rc=$?
+  left=$(ls -A "$tmp" | wc -l)
+  if [ $rc -eq 0 ] && [ -s "$out/sub/01-test.mp3" ] && [ "$left" -eq 0 ]; then
+    pass "writes the mp3 to the output path and cleans up temp files"
+  else
+    fail "output path: rc=$rc file_exists=$([ -s "$out/sub/01-test.mp3" ] && echo yes || echo no) leftover=$left"
+  fi
+  rm -rf "$tmp" "$out"
+else
+  skip "output path test needs edge-tts and mpv"
+fi
+
+# Test 7: output file already exists -> played without synthesis, so no edge-tts needed. Fake mpv.
+bin=$(mktemp -d); out=$(mktemp -d)
+make_bin "$bin" "${base[@]}"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$bin/mpv"
+chmod +x "$bin/mpv"
+printf 'not really audio' > "$out/existing.mp3"
+err=$(echo "ignored" | PATH="$bin" bash "$speak" "$out/existing.mp3" 2>&1 >/dev/null); rc=$?
+if [ $rc -eq 0 ]; then
+  pass "existing output file is replayed without edge-tts"
+else
+  fail "existing file replay: rc=$rc stderr=$err"
+fi
+rm -rf "$bin" "$out"
+
 exit $failed
