@@ -15,7 +15,7 @@ This is not read-aloud. Never speak plan text verbatim. Write a spoken briefing 
 
 The speech engine is configured per machine. Two of the engines run in a Docker container that this skill starts and stops:
 
-- Before the first section, run `"${CLAUDE_SKILL_DIR}/engine.sh" start` with a Bash timeout of 300000. With the default engine it returns at once. Otherwise it starts the container and waits until the engine answers.
+- Before the first section, run `"${CLAUDE_SKILL_DIR}/engine.sh" start` with a Bash timeout of 600000. The script gives up after five minutes on its own, so the longer tool timeout lets its message through. With the default engine it returns at once. Otherwise it starts the container and waits until the engine answers.
 - If it exits non-zero, audio is unavailable for this walkthrough. Follow the three text mode steps below, quoting its stderr line as the reason.
 - The last step of every walkthrough, text mode included, is `"${CLAUDE_SKILL_DIR}/engine.sh" stop`.
 

@@ -122,12 +122,19 @@ Owns the Docker container of the configured engine. `engine.sh start` and
   image. The pocket model is downloaded on the first start into the named
   volume `walk-me-through-pocket-cache`, mounted at `/root/.cache`.
 - `start`: checks `docker` and the daemon, reuses the container if one with
-  that name is running, otherwise runs it detached with `--rm` and the fixed
-  port. Then polls `GET <url>/health` once a second for up to 300 seconds.
-  Exit 0 when it answers. On timeout it prints the container's last log
-  lines, stops the container and exits 1.
-- `stop`: `docker stop` on that name. Exit 0 even if nothing was running or
-  docker is absent. `--rm` removes the stopped container.
+  that name is running, otherwise removes any stopped leftover and runs a
+  new one detached, with the port bound to localhost only. Then polls
+  `GET <url>/health` once a second until a wall clock deadline 300 seconds
+  ahead. Exit 0 when it answers. If the container exits on its own the poll
+  stops at once. In both failure cases it prints the container's last log
+  lines, removes the container and exits 1. The container is not run with
+  `--rm`, because that would delete the logs of a crash before they can be
+  shown.
+- `stop`: `docker rm -f` on that name. Exit 0 even if nothing was running,
+  docker is absent, or the engine name is unknown. The skill's last step
+  must never fail.
+- The skill calls `start` with a Bash timeout of 600000, longer than the
+  script's own deadline, so the script's message reaches the user.
 - The skill runs `start` before the first section and `stop` as its last
   step, text mode included. A walkthrough that is interrupted leaves the
   container running. The next `start` reuses it, or the user runs `stop` by
@@ -355,9 +362,12 @@ manual paths follow it for people who prefer to run the commands themselves.
 - Start with no running container runs `docker run` with the expected name,
   port and image, then exits 0 once health answers.
 - Start with a running container does not call `docker run`.
-- Start whose health never answers stops the container and exits non-zero
-  naming the wait and the last log lines. The pocket run carries its volume.
-- Stop calls `docker stop` on the container name and exits 0.
+- Start whose health never answers removes the container and exits non-zero
+  naming the wait and the last log lines. The pocket run carries its volume
+  and the localhost port binding. A fake `date` advances the clock.
+- Start whose container exits right away fails at once with the log lines.
+- Stop calls `docker rm -f` on the container name and exits 0, also with an
+  unknown engine name.
 
 `tests/test-install.sh`:
 
@@ -369,9 +379,11 @@ manual paths follow it for people who prefer to run the commands themselves.
   a daemon hint and no other docker call.
 - With an unknown engine name, exit non-zero naming the variable.
 
-The pocket path was also run once for real on 2026-09-16: image build, first
-start with model download in 18 seconds, one sentence synthesized and played,
-container stopped and removed. Kokoro was verified with the fakes only.
+The pocket path was also run for real on 2026-09-16: image build, first
+start with model download in 18 seconds, a second start from the cached model
+in 6 seconds, one sentence each with the default voice and with `marius`,
+port bound to localhost, container removed after stop. Kokoro was verified
+with the fakes only.
 
 Skill dry run against `tests/fixture-plan.md`:
 

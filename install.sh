@@ -68,7 +68,8 @@ if ! command -v mpv >/dev/null 2>&1; then
 fi
 
 if [ "$engine" != edge ]; then
-  echo "Starting the $engine container. The first start of pocket downloads its model and can take a few minutes..."
+  echo "Starting the $engine container..."
+  [ "$engine" = pocket ] && echo "The first start downloads the model and can take a few minutes."
   if ! "$here/engine.sh" start; then
     exit 1
   fi

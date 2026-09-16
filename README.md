@@ -110,6 +110,8 @@ The skill manages the container itself. It starts the container before the first
 ~/.claude/skills/walk-me-through/engine.sh stop
 ```
 
+The pocket model lives in the Docker volume `walk-me-through-pocket-cache`, so it is downloaded once. Remove it with `docker volume rm walk-me-through-pocket-cache` if you want the disk space back.
+
 Three environment variables, all optional.
 
 | Variable | Default | Meaning |
