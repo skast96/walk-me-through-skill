@@ -71,6 +71,27 @@ At the end Claude does three things:
 
 The skill never starts on its own. You always invoke it by hand.
 
+## Listen again
+
+Every briefing is saved as an mp3 in the project, next to a transcript:
+
+```
+docs/walk-me/2026-09-16-my-feature/
+  01-overview.mp3
+  02-constraints.mp3
+  03-csv-formatter.mp3
+  ...
+  transcript.md
+```
+
+Replay the whole walkthrough in order with any player, for example:
+
+```
+mpv docs/walk-me/2026-09-16-my-feature/
+```
+
+The skill adds `docs/walk-me/` to the project's `.gitignore`, so the audio stays local. The next walkthrough of the same plan replaces the folder.
+
 ## Voice
 
 Two environment variables, both optional. Set them in your shell profile.

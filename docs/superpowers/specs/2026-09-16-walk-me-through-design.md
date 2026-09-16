@@ -51,7 +51,11 @@ it under `~/.claude/skills/walk-me-through/`.
 Contract:
 
 - Reads UTF-8 text from stdin.
-- Renders it with `edge-tts` to an mp3 in a temporary file.
+- Takes one optional argument, the output mp3 path.
+- Without the argument, renders with `edge-tts` to an mp3 in a temporary file.
+- With the argument, renders to that path, creating parent directories, and
+  keeps the file. If the file already exists and is not empty, plays it as is
+  and ignores stdin. A failed synthesis removes the partial file.
 - Plays the mp3 with `mpv --no-video --really-quiet`.
 - Blocks until playback ends. This is what makes the skill wait.
 - Exits 0 on success. Exits non-zero if `edge-tts` is missing, the network
@@ -139,6 +143,35 @@ There is no automatic offer after writing-plans and no matching on phrases.
   where the listener's input is most valuable.
 - No filler openers and no praise of the plan.
 
+### Saved audio
+
+Every briefing is kept as an mp3 in the project so the user can replay the
+walkthrough with any player and without Claude.
+
+- Folder: `docs/walk-me/<plan-basename>/` relative to the project root. The
+  basename is the plan file name without directory and without `.md`.
+- If the basename is empty or contains `/` or `..`, the skill asks for a
+  folder name instead. It never removes anything outside `docs/walk-me/`.
+- Before the first section the skill removes an existing folder for that plan.
+  Then it creates the folder fresh. A new walkthrough replaces the old audio.
+- Before the first section the skill ensures the project's `.gitignore` has
+  the line `docs/walk-me/`, creating the file if needed, and says so in text.
+- File names: two digit playback order, hyphen, short lowercase hyphenated
+  section name. In order:
+  - `01-overview.mp3`
+  - `02-constraints.mp3`
+  - one file per task section
+  - `NN-risks.mp3`
+  - `NN-wrap-up.mp3`
+- A Go deeper briefing is `NNb-<name>-deeper.mp3`.
+- Repeat runs the same speak command. The file exists, so speak.sh replays it
+  without synthesis.
+- `transcript.md` in the folder holds every briefing under a heading with its
+  file name. It is written in text mode too, with the names the audio would
+  have had.
+- At the end the skill names the folder and the replay command
+  `mpv <folder>/`.
+
 ### Applying feedback
 
 Feedback is applied to the plan file only, never to the spec. Changes that
@@ -216,6 +249,7 @@ manual paths follow it for people who prefer to run the commands themselves.
 | No plan path and no plans directory | Skill asks for a path. |
 | Plan path given but the file does not exist | Skill asks for a path. |
 | Plans directory exists but is empty | Skill asks for a path. |
+| Audio folder cannot be created | `speak.sh` exits 1. Skill falls back to text. Transcript is still attempted. |
 | Feedback contradicts an earlier comment | Skill asks which one wins before applying. |
 
 ## Testing
@@ -227,6 +261,10 @@ manual paths follow it for people who prefer to run the commands themselves.
 - With `PATH` stripped of `edge-tts`, `speak.sh` exits non-zero and prints a
   reason on stderr.
 - With `PATH` stripped of `mpv`, same.
+- With an output path in a fresh directory, the mp3 exists afterwards and the
+  temporary directory is empty.
+- With an output path that already exists and `PATH` stripped of `edge-tts`,
+  the file is played and the exit code is 0.
 
 Skill dry run against `tests/fixture-plan.md`:
 
@@ -261,6 +299,10 @@ be unit tested from a shell.
 - **Feedback edits the plan directly.** A separate notes file would need a
   second pass to apply. Editing directly keeps the plan the single source of
   truth for executors.
+- **Audio is saved per section and ignored by git.** A folder of numbered
+  mp3s replays in any player with real keyboard controls, which is the cheap
+  answer to in-session playback controls. Ignored by git because the files
+  are regenerable from the plan and cost about fifty kilobytes per section.
 - **Repository is the skill directory, root `SKILL.md`.** This is the layout
   the skills CLI discovers, and it also works with a plain git clone. No
   plugin marketplace is needed for one person on several machines. A
