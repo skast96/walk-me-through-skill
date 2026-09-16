@@ -12,10 +12,12 @@ typed feedback. At the end it applies your feedback to the plan file.
 Paste this into Claude Code on the new machine:
 
 > Install the Claude Code skill from https://github.com/skast96/walk-me-through-skill.
-> Run `npx skills add skast96/walk-me-through-skill -g -a claude-code -y`.
-> If that fails, git clone the repository to `~/.claude/skills/walk-me-through`.
-> Then run `~/.claude/skills/walk-me-through/install.sh`, show me its output,
-> and remind me to restart Claude Code.
+>
+> 1. Run `npx skills add skast96/walk-me-through-skill -g -a claude-code -y`.
+> 2. If that fails, git clone the repository to `~/.claude/skills/walk-me-through`.
+> 3. Run `~/.claude/skills/walk-me-through/install.sh`.
+> 4. Show me its output.
+> 5. Remind me to restart Claude Code.
 
 ### By hand, with the skills CLI
 
@@ -54,10 +56,18 @@ In a Claude Code session, in a project that has a plan:
 
 Without a path the skill takes the newest file in `docs/superpowers/plans/`.
 
-Claude speaks the plan in four to eight sections. After each one you get a
-prompt with Continue, Repeat, Go deeper, or a free text field for comments.
-At the end Claude summarizes your comments, edits the plan file, and prints
-what changed.
+Claude speaks the plan in four to eight sections. After each one you get a prompt with these choices:
+
+- Continue
+- Repeat
+- Go deeper
+- A free text field for your comments
+
+At the end Claude does three things:
+
+- It summarizes your comments.
+- It edits the plan file.
+- It prints what changed.
 
 The skill never starts on its own. You always invoke it by hand.
 
