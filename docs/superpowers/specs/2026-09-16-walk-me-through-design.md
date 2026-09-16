@@ -19,6 +19,8 @@ writes a short spoken briefing per section and speaks that.
   the speak step for a conversational MCP server such as voicemode.
 - No hooks in `settings.json`. The skill drives every step itself.
 - No patching of the superpowers plugin. The writing-plans skill stays as is.
+- No automatic invocation. Claude does not offer or start the walkthrough.
+  The user runs `/walk-me-through` by hand.
 - No support for plans outside the writing-plans format. Other markdown is
   best effort only.
 
@@ -71,23 +73,21 @@ depend on the Claude Code scratchpad path.
 
 ## Component: SKILL.md
 
-Frontmatter: `name: walk-me-through`, a `description` that carries the
-trigger phrases, and `argument-hint: [plan-path]`. No other fields. The
-`name` must equal the directory name so the skills CLI and a manual clone
-produce the same command, `/walk-me-through`.
+Frontmatter: `name: walk-me-through`, a `description`,
+`argument-hint: [plan-path]`, and `disable-model-invocation: true`. No other
+fields. The `name` must equal the directory name so the skills CLI and a
+manual clone produce the same command, `/walk-me-through`. The
+`disable-model-invocation` flag means Claude never starts the walkthrough on
+its own. The user always invokes it by hand.
 
 ### Trigger
 
-The description matches when:
-
-- the user types `/walk-me-through <plan path>` or says "walk me through the
-  plan", "explain the plan to me", "brief me on the plan"
-- a plan was just saved by writing-plans. The skill instructs Claude to offer
-  the walkthrough as a third option next to the two execution options.
-
-If no plan path is given, the skill uses the most recently modified file in
+Manual only. The user types `/walk-me-through <plan path>`. The plan path is
+optional. Without it, the skill uses the most recently modified file in
 `docs/superpowers/plans/`. If that directory does not exist, it asks for a
 path.
+
+There is no automatic offer after writing-plans and no matching on phrases.
 
 ### Flow
 
