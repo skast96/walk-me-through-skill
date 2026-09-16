@@ -32,8 +32,10 @@ clone into the personal skills directory.
 ```
 ~/.claude/skills/walk-me-through/
   SKILL.md              the skill: trigger, flow, briefing rules
-  speak.sh              text on stdin -> edge-tts or Kokoro -> mpv
-  install.sh            checks the configured engine, mpv and audio
+  speak.sh              text on stdin -> configured engine -> mpv
+  engine.sh             starts and stops the engine's Docker container
+  install.sh            fetches the configured engine, checks mpv and audio
+  docker/pocket/        Dockerfile for the pocket-tts server
   README.md             what it is, install, usage, voice override
   docs/superpowers/specs/   this document
   docs/superpowers/plans/   implementation plan
@@ -51,46 +53,53 @@ it under `~/.claude/skills/walk-me-through/`.
 Contract:
 
 - Reads UTF-8 text from stdin.
-- Takes one optional argument, the output mp3 path.
-- Renders with the configured engine: `edge-tts` or a Kokoro-FastAPI server.
-  Without the argument, the mp3 goes to a temporary file.
+- Takes one optional argument, the output path without extension. The script
+  appends `.mp3` for edge and kokoro and `.wav` for pocket, because that is
+  what each engine returns. Converting would need ffmpeg and was rejected.
+- Renders with the configured engine. Without the argument, the audio goes to
+  a temporary file.
 - With the argument, renders to that path, creating parent directories, and
   keeps the file. If the file already exists and is not empty, plays it as is
   and ignores stdin. A failed synthesis removes the partial file.
-- Plays the mp3 with `mpv --no-video --really-quiet`.
+- Plays the audio with `mpv --no-video --really-quiet`.
 - Blocks until playback ends. This is what makes the skill wait.
 - Exits 0 on success. Exits non-zero if the configured engine is missing or
-  unreachable, synthesis fails, or `mpv` is missing. It prints one short
-  reason to stderr. There is no fallback from one engine to the other. The
+  not answering, synthesis fails, or `mpv` is missing. It prints one short
+  reason to stderr. There is no fallback from one engine to another. The
   user chose the engine and must learn that it is not working, not hear a
   different voice.
 - Deletes the temporary file afterwards.
 
 Configuration:
 
-- `WALK_ME_THROUGH_TTS` selects the engine: `edge` (default) or `kokoro`.
-  Any other value is an error.
+- `WALK_ME_THROUGH_TTS` selects the engine: `edge` (default), `kokoro` or
+  `pocket`. Any other value is an error.
 - `WALK_ME_THROUGH_VOICE` selects the voice of the chosen engine. Default is
-  `en-US-AndrewMultilingualNeural` for edge and `af_heart` for kokoro.
+  `en-US-AndrewMultilingualNeural` for edge and `af_heart` for kokoro. For
+  pocket the default is empty, which means the server's built-in voice.
 - `WALK_ME_THROUGH_RATE` is a whole percent such as `+10%`. edge-tts gets it
   as `--rate`. Kokoro gets it converted to `speed`, so `+10%` becomes `1.10`.
-  A value that is not a whole percent is an error on the kokoro path.
-- `WALK_ME_THROUGH_KOKORO_URL` is the Kokoro-FastAPI base URL. Default
-  `http://localhost:8880`.
+  A value that is not a whole percent is an error on the kokoro path. Pocket
+  has no speed control and ignores the value.
 - Nothing else is configurable. Configuration lives per machine in the `env`
   block of `~/.claude/settings.json`, which Claude Code passes to every Bash
   command. A file inside the skill directory was rejected: the skills CLI
   installs a symlinked copy that `npx skills update` refreshes, so a per
   machine file there would not survive.
 
-Kokoro path:
+Container engines talk to a fixed local port, kokoro on 8880 and pocket on
+8000. The ports are the images' defaults and appear in both speak.sh and
+engine.sh. Both scripts check `GET <url>/health` with a two second timeout
+before doing anything else and need `curl`.
 
-- Presence check is `GET <url>/health` with a two second timeout.
-- Synthesis is `POST <url>/v1/audio/speech` with a JSON body of `model`,
-  `input`, `voice`, `response_format` mp3 and `speed`, written with `curl`
-  to the output path. The text is JSON escaped in bash: backslash, double
-  quote, newline, carriage return and tab.
-- Needs `curl`. Missing curl is an error with a reason.
+Kokoro synthesis is `POST <url>/v1/audio/speech` with a JSON body of `model`,
+`input`, `voice`, `response_format` mp3 and `speed`, written with `curl` to
+the output path. The text is JSON escaped in bash: backslash, double quote,
+newline, carriage return and tab.
+
+Pocket synthesis is `POST <url>/tts` as a multipart form with the field
+`text` read from the text file and, when a voice is set, the field
+`voice_url` with the voice name. The response is wav.
 
 There is no way to skip a section while it plays. The skill runs the script
 through Claude's Bash tool, which has no terminal attached, so mpv keyboard
@@ -99,6 +108,30 @@ input does not work. Sections are kept short instead. mpv gets
 
 Temporary files go to `${TMPDIR:-/tmp}` via `mktemp`. The skill does not
 depend on the Claude Code scratchpad path.
+
+## Component: engine.sh
+
+Owns the Docker container of the configured engine. `engine.sh start` and
+`engine.sh stop`, nothing else.
+
+- For edge both actions exit 0 at once. There is no container.
+- Container name: `walk-me-through-<engine>`. Images: kokoro uses
+  `ghcr.io/remsky/kokoro-fastapi-cpu:latest`, which has its models baked in.
+  Pocket uses `walk-me-through-pocket`, built by install.sh from
+  `docker/pocket/Dockerfile`, because the pocket-tts project publishes no
+  image. The pocket model is downloaded on the first start into the named
+  volume `walk-me-through-pocket-cache`, mounted at `/root/.cache`.
+- `start`: checks `docker` and the daemon, reuses the container if one with
+  that name is running, otherwise runs it detached with `--rm` and the fixed
+  port. Then polls `GET <url>/health` once a second for up to 300 seconds.
+  Exit 0 when it answers. On timeout it prints the container's last log
+  lines, stops the container and exits 1.
+- `stop`: `docker stop` on that name. Exit 0 even if nothing was running or
+  docker is absent. `--rm` removes the stopped container.
+- The skill runs `start` before the first section and `stop` as its last
+  step, text mode included. A walkthrough that is interrupted leaves the
+  container running. The next `start` reuses it, or the user runs `stop` by
+  hand. A skill cannot register cleanup for a session that ends.
 
 ## Component: SKILL.md
 
@@ -257,13 +290,15 @@ manual paths follow it for people who prefer to run the commands themselves.
 
 - Resolves its own directory through the symlink, since Path 1 installs a
   symlink. Uses `readlink -f` on `$0`.
-- Reads `WALK_ME_THROUGH_TTS` and checks only that engine.
+- Reads `WALK_ME_THROUGH_TTS` and prepares only that engine.
 - For edge: checks for `uv` and prints the uv install one-liner if missing.
   Runs `uv tool install edge-tts` if the `edge-tts` command is missing.
-- For kokoro: checks for `curl` and that `GET <url>/health` answers. Prints
-  the URL and exits if not.
+- For kokoro: checks docker and the daemon, then pulls the Kokoro image.
+- For pocket: checks docker and the daemon, then builds the pocket image.
 - Checks for `mpv`. Prints the distro package hint and exits if missing.
-- Speaks one test sentence so the user hears it works.
+- Runs `engine.sh start`, speaks one test sentence so the user hears it
+  works, then runs `engine.sh stop`. The first pocket start downloads the
+  model, so the script says that this can take minutes.
 - Reminds the user to restart Claude Code so the new skill is picked up.
 
 ## Error handling
@@ -272,8 +307,11 @@ manual paths follow it for people who prefer to run the commands themselves.
 |---|---|
 | `edge-tts` not installed | `speak.sh` exits 1. Skill falls back to text. |
 | No network | `speak.sh` exits 1 after edge-tts fails. Skill falls back to text. |
-| Kokoro chosen but not reachable | `speak.sh` exits 1 naming the URL. No switch to edge-tts. Skill falls back to text. |
-| Kokoro chosen, `curl` missing | `speak.sh` exits 1. Skill falls back to text. |
+| Container engine chosen, docker missing or daemon down | `engine.sh start` exits 1 with a hint. Skill falls back to text. |
+| Container does not answer within 300 seconds | `engine.sh start` prints the last log lines, stops the container, exits 1. Skill falls back to text. |
+| Container engine not answering when speaking | `speak.sh` exits 1 naming the engine and the URL. No switch to edge-tts. Skill falls back to text. |
+| Container engine chosen, `curl` missing | `engine.sh start` exits 1. Skill falls back to text. |
+| Walkthrough interrupted | Container stays up. Next `engine.sh start` reuses it, or the user runs `engine.sh stop`. |
 | Unknown value in `WALK_ME_THROUGH_TTS` | `speak.sh` exits 1 naming the variable. Skill falls back to text. |
 | `mpv` missing | `speak.sh` exits 1. Skill falls back to text. |
 | Plan not in writing-plans format | Skill still splits on top-level headings and says the format is unfamiliar. |
@@ -298,21 +336,42 @@ manual paths follow it for people who prefer to run the commands themselves.
   the file is played and the exit code is 0.
 - With an unknown engine name, exit non-zero and the reason names the variable.
 - With kokoro chosen and no `curl` on `PATH`, exit non-zero with a reason.
-- With kokoro chosen and a fake `curl` whose health check fails, exit non-zero
+- With kokoro chosen and a fake `curl` that serves another port, exit non-zero
   naming the URL, and a fake `edge-tts` on `PATH` is never run.
 - With kokoro chosen and a fake `curl` that answers, the mp3 is written and
   the request body carries the voice, the converted speed and the escaped text.
   The rate in this test has a leading zero, so `+08%` must become `1.08`.
 - With kokoro chosen and a rate that is not a whole percent, exit non-zero
   naming the variable, and no synthesis request is sent.
+- With pocket chosen and a fake `curl` that answers, a `.wav` is written next
+  to the given path and the request carries the text file and the voice field.
+- With pocket chosen and no voice set, no voice field is sent.
+
+`tests/test-engine.sh`, with fake `docker`, `curl` and `sleep` scripts:
+
+- For edge, start and stop exit 0 without docker on `PATH`.
+- An unknown engine or an unknown action exits non-zero with a reason.
+- A container engine without docker exits non-zero with a reason.
+- Start with no running container runs `docker run` with the expected name,
+  port and image, then exits 0 once health answers.
+- Start with a running container does not call `docker run`.
+- Start whose health never answers stops the container and exits non-zero
+  naming the wait and the last log lines. The pocket run carries its volume.
+- Stop calls `docker stop` on the container name and exits 0.
 
 `tests/test-install.sh`:
 
 - With `uv` missing, exit non-zero and the uv install hint is printed.
 - With `uv` and `edge-tts` present and `mpv` missing, exit non-zero with the
   package hint.
-- With kokoro chosen and a fake `curl` that fails, exit non-zero naming the URL.
+- With kokoro chosen and docker missing, exit non-zero with a docker hint.
+- With pocket chosen and a fake docker whose `info` fails, exit non-zero with
+  a daemon hint and no other docker call.
 - With an unknown engine name, exit non-zero naming the variable.
+
+The pocket path was also run once for real on 2026-09-16: image build, first
+start with model download in 18 seconds, one sentence synthesized and played,
+container stopped and removed. Kokoro was verified with the fakes only.
 
 Skill dry run against `tests/fixture-plan.md`:
 
@@ -344,12 +403,21 @@ be unit tested from a shell.
 - **edge-tts over piper and espeak-ng.** Natural voice, no key, one-line
   install. Cost: needs network while speaking. Acceptable because the
   fallback is text.
-- **Kokoro as a second, configured engine. No automatic fallback.** A local
-  Kokoro-FastAPI server is faster and works offline, but the user starts the
-  container by hand. Auto-detecting it and silently switching to edge-tts
-  when it is down was rejected: the user would hear a different voice and not
-  learn that the container stopped. The engine is chosen per machine and a
-  missing engine is an error the skill reports.
+- **Kokoro and pocket as configured engines. No automatic fallback.** Both
+  run on CPU in Docker and work offline. Auto-detecting a server and silently
+  switching to edge-tts when it is down was rejected: the user would hear a
+  different voice and not learn that the container stopped. The engine is
+  chosen per machine and a missing engine is an error the skill reports.
+- **The skill starts and stops the container.** A container that runs all
+  the time costs memory for nothing between walkthroughs. The skill starts it
+  before the first section and stops it at the end. Cost: the first section
+  waits for the start, a few seconds for kokoro and pocket after the first
+  run. A container left behind by an interrupted session is reused next time.
+- **Own Dockerfile for pocket.** The pocket-tts project publishes no image.
+  Community images exist, but the only prebuilt one speaks the Wyoming
+  protocol for Home Assistant, which curl cannot use, and the OpenAI style
+  ones are built from source as well. A six line Dockerfile in this repo is
+  the smallest dependency.
 - **Feedback edits the plan directly.** A separate notes file would need a
   second pass to apply. Editing directly keeps the plan the single source of
   truth for executors.

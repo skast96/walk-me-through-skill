@@ -1,25 +1,35 @@
 #!/usr/bin/env bash
 # speak.sh: read text on stdin, synthesize it with the configured engine, play it with mpv.
 # Blocks until playback ends. Exit 0 on success, 1 with a reason on stderr otherwise.
-# Usage: speak.sh [OUTPUT.mp3]
+# Usage: speak.sh [OUTPUT]
+#   OUTPUT is a path without extension. The script appends .mp3 (edge, kokoro) or .wav (pocket).
 #   Without OUTPUT the audio goes to a temp file that is removed afterwards.
-#   With OUTPUT the mp3 is written there and kept. If OUTPUT already exists it is
+#   With OUTPUT the file is written there and kept. If it already exists it is
 #   played as is and stdin is ignored, so a repeat needs no synthesis.
-# Env: WALK_ME_THROUGH_TTS         edge (default) or kokoro. No fallback between them.
-#      WALK_ME_THROUGH_VOICE       voice name for the chosen engine
-#      WALK_ME_THROUGH_RATE        whole percent, e.g. +10%. Kokoro gets it as speed 1.10.
-#      WALK_ME_THROUGH_KOKORO_URL  base URL of a Kokoro-FastAPI server, default http://localhost:8880
+# Env: WALK_ME_THROUGH_TTS    edge (default), kokoro or pocket. No fallback between them.
+#      WALK_ME_THROUGH_VOICE  voice name for the chosen engine
+#      WALK_ME_THROUGH_RATE   whole percent, e.g. +10%. Kokoro gets it as speed 1.10. Pocket ignores it.
+# kokoro and pocket talk to the container that engine.sh starts, on a fixed local port.
 set -u
 engine="${WALK_ME_THROUGH_TTS:-edge}"
 rate="${WALK_ME_THROUGH_RATE:-+0%}"
-kokoro_url="${WALK_ME_THROUGH_KOKORO_URL:-http://localhost:8880}"
 case "$engine" in
-  edge)   voice="${WALK_ME_THROUGH_VOICE:-en-US-AndrewMultilingualNeural}" ;;
-  kokoro) voice="${WALK_ME_THROUGH_VOICE:-af_heart}" ;;
+  edge)
+    voice="${WALK_ME_THROUGH_VOICE:-en-US-AndrewMultilingualNeural}"
+    ext=mp3 ;;
+  kokoro)
+    voice="${WALK_ME_THROUGH_VOICE:-af_heart}"
+    url="http://localhost:8880"
+    ext=mp3 ;;
+  pocket)
+    voice="${WALK_ME_THROUGH_VOICE:-}"
+    url="http://localhost:8000"
+    ext=wav ;;
   *)
-    echo "speak.sh: WALK_ME_THROUGH_TTS is '$engine'. Use 'edge' or 'kokoro'." >&2; exit 1 ;;
+    echo "speak.sh: WALK_ME_THROUGH_TTS is '$engine'. Use 'edge', 'kokoro' or 'pocket'." >&2; exit 1 ;;
 esac
 output="${1:-}"
+[ -n "$output" ] && output="$output.$ext"
 
 if ! command -v mpv >/dev/null 2>&1; then
   echo "speak.sh: mpv not found. Run install.sh in the skill directory." >&2; exit 1
@@ -33,10 +43,10 @@ check_engine() {
     fi
   else
     if ! command -v curl >/dev/null 2>&1; then
-      echo "speak.sh: curl not found. It is needed to talk to Kokoro." >&2; exit 1
+      echo "speak.sh: curl not found. It is needed to talk to $engine." >&2; exit 1
     fi
-    if ! curl -sf --max-time 2 "$kokoro_url/health" >/dev/null 2>&1; then
-      echo "speak.sh: Kokoro is not reachable at $kokoro_url. Start the FastKoko container or set WALK_ME_THROUGH_KOKORO_URL." >&2; exit 1
+    if ! curl -sf --max-time 2 "$url/health" >/dev/null 2>&1; then
+      echo "speak.sh: $engine is not answering at $url. Run engine.sh start in the skill directory." >&2; exit 1
     fi
   fi
 }
@@ -66,11 +76,21 @@ synth_kokoro() {
   fi
   pct="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
   speed=$(( (100 + pct) / 100 )).$(printf '%02d' $(( (100 + pct) % 100 )))
-  if ! err=$(curl -sfS --max-time 300 -X POST "$kokoro_url/v1/audio/speech" \
+  if ! err=$(curl -sfS --max-time 300 -X POST "$url/v1/audio/speech" \
       -H 'Content-Type: application/json' \
       -d "{\"model\":\"kokoro\",\"input\":\"$text\",\"voice\":\"$voice\",\"response_format\":\"mp3\",\"speed\":$speed}" \
       -o "$2" 2>&1); then
-    echo "speak.sh: Kokoro at $kokoro_url failed to synthesize. Check the voice name '$voice'. ${err##*$'\n'}" >&2
+    echo "speak.sh: kokoro at $url failed to synthesize. Check the voice name '$voice'. ${err##*$'\n'}" >&2
+    return 1
+  fi
+}
+
+# synth_pocket TEXT_FILE AUDIO_FILE
+synth_pocket() {
+  local err voice_args=()
+  [ -n "$voice" ] && voice_args=(-F "voice_url=$voice")
+  if ! err=$(curl -sfS --max-time 300 -X POST "$url/tts" -F "text=<$1" ${voice_args[@]+"${voice_args[@]}"} -o "$2" 2>&1); then
+    echo "speak.sh: pocket at $url failed to synthesize. Check the voice name '$voice'. ${err##*$'\n'}" >&2
     return 1
   fi
 }
@@ -87,7 +107,7 @@ else
     fi
     trap 'rm -f "$text_file"' EXIT
   else
-    audio_file="$text_file.mp3"
+    audio_file="$text_file.$ext"
     trap 'rm -f "$text_file" "$audio_file"' EXIT
   fi
   cat > "$text_file"

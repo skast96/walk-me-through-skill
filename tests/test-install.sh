@@ -8,7 +8,7 @@ install="$here/../install.sh"
 failed=0
 # The tests below assume the edge engine unless they set WALK_ME_THROUGH_TTS themselves.
 export WALK_ME_THROUGH_TTS=edge
-unset WALK_ME_THROUGH_VOICE WALK_ME_THROUGH_RATE WALK_ME_THROUGH_KOKORO_URL
+unset WALK_ME_THROUGH_VOICE WALK_ME_THROUGH_RATE
 
 pass() { echo "PASS: $1"; }
 fail() { echo "FAIL: $1"; failed=1; }
@@ -50,19 +50,30 @@ else
   skip "missing mpv test needs uv and edge-tts installed"
 fi
 
-# Test 3: kokoro chosen, server unreachable -> exit 1, prints the URL. Fake curl that always fails.
+# Test 3: kokoro chosen, docker missing -> exit 1 with a docker hint. Nothing is pulled.
 bin=$(mktemp -d)
 make_bin "$bin" "${base[@]}"
-printf '#!/usr/bin/env bash\nexit 7\n' > "$bin/curl"; chmod +x "$bin/curl"
-err=$(WALK_ME_THROUGH_TTS=kokoro WALK_ME_THROUGH_KOKORO_URL="http://fake:8880" PATH="$bin" bash "$install" 2>&1 >/dev/null); rc=$?
-if [ $rc -ne 0 ] && [[ "$err" == *"Kokoro is not reachable at http://fake:8880"* ]]; then
-  pass "unreachable kokoro exits non-zero with the URL"
+err=$(WALK_ME_THROUGH_TTS=kokoro PATH="$bin" bash "$install" 2>&1 >/dev/null); rc=$?
+if [ $rc -ne 0 ] && [[ "$err" == *"docker is missing"* ]]; then
+  pass "kokoro without docker exits non-zero with hint"
 else
-  fail "unreachable kokoro: rc=$rc stderr=$err"
+  fail "kokoro without docker: rc=$rc stderr=$err"
 fi
 rm -rf "$bin"
 
-# Test 4: unknown engine -> exit 1, names the variable
+# Test 4: pocket chosen, docker present but daemon down -> exit 1 with a daemon hint. Fake docker whose info fails.
+bin=$(mktemp -d)
+make_bin "$bin" "${base[@]}"
+printf '#!/usr/bin/env bash\n[ "$1" = info ] && exit 1\necho "docker must not do $*" >&2\nexit 1\n' > "$bin/docker"; chmod +x "$bin/docker"
+err=$(WALK_ME_THROUGH_TTS=pocket PATH="$bin" bash "$install" 2>&1 >/dev/null); rc=$?
+if [ $rc -ne 0 ] && [[ "$err" == *"daemon is not running"* ]] && [[ "$err" != *"docker must not do"* ]]; then
+  pass "pocket with a stopped daemon exits non-zero with hint"
+else
+  fail "pocket daemon down: rc=$rc stderr=$err"
+fi
+rm -rf "$bin"
+
+# Test 5: unknown engine -> exit 1, names the variable
 bin=$(mktemp -d)
 make_bin "$bin" "${base[@]}"
 err=$(WALK_ME_THROUGH_TTS=bogus PATH="$bin" bash "$install" 2>&1 >/dev/null); rc=$?
