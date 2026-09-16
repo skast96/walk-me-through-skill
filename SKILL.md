@@ -16,20 +16,25 @@ This is not read-aloud. Never speak plan text verbatim. Write a spoken briefing 
 Speak a briefing by piping it into the speak script. Use a Bash timeout of 300000 so long sections finish:
 
 ```bash
-cat <<'BRIEFING' | ${CLAUDE_SKILL_DIR}/speak.sh
+cat <<'BRIEFING' | "${CLAUDE_SKILL_DIR}/speak.sh"
 <briefing text>
 BRIEFING
 ```
 
-The script blocks until playback ends. If it exits non-zero, audio is unavailable for this walkthrough. Print the briefing as text instead, tell the user once that audio is off and why (use the script's stderr line), and continue in text mode for every remaining section. Do not retry audio.
+The script blocks until playback ends. If it exits non-zero, audio is unavailable for this walkthrough. Then do three things:
+
+- Print the briefing as text instead.
+- Tell the user once that audio is off, quoting the script's stderr line as the reason.
+- Continue in text mode for every remaining section. Do not retry audio.
 
 ## Procedure
 
 ### 1. Find the plan
 
 - If `$ARGUMENTS` names a file, use it.
+- If `$ARGUMENTS` names a file that does not exist, ask the user for a path and stop until you have one.
 - Otherwise use the most recently modified file in `docs/superpowers/plans/`.
-- If that directory does not exist, ask the user for a path and stop until you have one.
+- If that directory does not exist or is empty, ask the user for a path and stop until you have one.
 - Read the plan. If its header names a spec file, read the spec too.
 
 ### 2. Build the section list
@@ -53,7 +58,7 @@ For every section:
 2. Speak it.
 3. Ask with AskUserQuestion. Question: "Any thoughts on this part?" Options, in this order:
    - **Continue** - next section.
-   - **Repeat** - speak the same briefing again.
+   - **Repeat** - speak the same briefing again, then ask again.
    - **Go deeper** - write and speak a second briefing on the same section, up to 250 words, covering the individual steps, the interfaces, and what the tests check. Then ask again.
    - The built in Other field is where the user types comments.
 4. When the user types a comment:

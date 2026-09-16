@@ -77,4 +77,21 @@ else
   skip "success test needs edge-tts and mpv"
 fi
 
+# Test 5: mpv fails -> exit 1, reason on stderr. Uses a fake mpv. Needs network.
+if [ $have_edge -eq 1 ]; then
+  bin=$(mktemp -d)
+  make_bin "$bin" "${base[@]}" edge-tts
+  printf '#!/usr/bin/env bash\nexit 2\n' > "$bin/mpv"
+  chmod +x "$bin/mpv"
+  err=$(echo "hello" | PATH="$bin:$PATH" bash "$speak" 2>&1 >/dev/null); rc=$?
+  if [ $rc -ne 0 ] && [[ "$err" == *"mpv failed"* ]]; then
+    pass "mpv failure exits non-zero with reason"
+  else
+    fail "mpv failure: rc=$rc stderr=$err"
+  fi
+  rm -rf "$bin"
+else
+  skip "mpv failure test needs edge-tts installed"
+fi
+
 exit $failed

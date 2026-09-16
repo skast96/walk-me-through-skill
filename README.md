@@ -31,7 +31,7 @@ Update later on any machine with `npx skills update -g`.
 ### By hand, with git
 
 ```
-git clone git@github.com:skast96/walk-me-through-skill.git ~/.claude/skills/walk-me-through
+git clone https://github.com/skast96/walk-me-through-skill.git ~/.claude/skills/walk-me-through
 ~/.claude/skills/walk-me-through/install.sh
 ```
 
@@ -86,6 +86,7 @@ List voices with `edge-tts --list-voices`.
 
 - Claude Code
 - `uv` for installing edge-tts
+- Node with npx for the skills CLI install path. The git path does not need it.
 - `mpv` for playback
 - Network access while speaking. edge-tts uses Microsoft's online voices.
   Without network the walkthrough falls back to text.

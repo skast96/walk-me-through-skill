@@ -24,9 +24,12 @@ if [ ! -s "$text_file" ]; then
   exit 1
 fi
 
-if ! edge-tts --voice "$voice" --rate "$rate" --file "$text_file" --write-media "$audio_file" >/dev/null 2>&1; then
-  echo "speak.sh: edge-tts failed. Check network access and the voice name '$voice'." >&2
+if ! tts_err=$(edge-tts --voice "$voice" --rate "$rate" --file "$text_file" --write-media "$audio_file" 2>&1 >/dev/null); then
+  echo "speak.sh: edge-tts failed. Check network access and the voice name '$voice'. ${tts_err##*$'\n'}" >&2
   exit 1
 fi
 
-mpv --no-video --really-quiet "$audio_file" </dev/null
+if ! mpv --no-video --really-quiet "$audio_file" </dev/null; then
+  echo "speak.sh: mpv failed to play the audio. Check the audio output." >&2
+  exit 1
+fi

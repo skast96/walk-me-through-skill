@@ -86,8 +86,9 @@ its own. The user always invokes it by hand.
 
 Manual only. The user types `/walk-me-through <plan path>`. The plan path is
 optional. Without it, the skill uses the most recently modified file in
-`docs/superpowers/plans/`. If that directory does not exist, it asks for a
-path.
+`docs/superpowers/plans/`. If that directory does not exist or is empty, it
+asks for a path. A path that names a missing file also leads to that
+question.
 
 There is no automatic offer after writing-plans and no matching on phrases.
 
@@ -213,6 +214,8 @@ manual paths follow it for people who prefer to run the commands themselves.
 | `mpv` missing | `speak.sh` exits 1. Skill falls back to text. |
 | Plan not in writing-plans format | Skill still splits on top-level headings and says the format is unfamiliar. |
 | No plan path and no plans directory | Skill asks for a path. |
+| Plan path given but the file does not exist | Skill asks for a path. |
+| Plans directory exists but is empty | Skill asks for a path. |
 | Feedback contradicts an earlier comment | Skill asks which one wins before applying. |
 
 ## Testing
