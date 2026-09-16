@@ -40,8 +40,9 @@ clone into the personal skills directory.
     test-speak.sh       tests for speak.sh
 ```
 
-The skill name is the directory name, `walk-me-through`. The repository name
-on GitHub is `walk-me-through-skill`. The clone command renames it.
+The skill name is `walk-me-through`. The repository name on GitHub is
+`walk-me-through-skill`. Both install paths in the Installation section put
+it under `~/.claude/skills/walk-me-through/`.
 
 ## Component: speak.sh
 
@@ -69,6 +70,11 @@ Temporary files go to `${TMPDIR:-/tmp}` via `mktemp`. The skill does not
 depend on the Claude Code scratchpad path.
 
 ## Component: SKILL.md
+
+Frontmatter: `name: walk-me-through`, a `description` that carries the
+trigger phrases, and `argument-hint: [plan-path]`. No other fields. The
+`name` must equal the directory name so the skills CLI and a manual clone
+produce the same command, `/walk-me-through`.
 
 ### Trigger
 
@@ -142,13 +148,54 @@ existing ones.
 
 ## Installation on a new machine
 
+Two supported paths. Both end with the skill at
+`~/.claude/skills/walk-me-through/` and both need `install.sh` once.
+
+### Path 1: skills CLI (primary)
+
+The [skills CLI](https://github.com/vercel-labs/skills) is the current
+cross-agent standard for installing a skill from a git repository. It
+discovers the root `SKILL.md`, installs a canonical copy, and symlinks it into
+`~/.claude/skills/<name>/`. The `<name>` comes from the frontmatter `name`
+field, so that field must be `walk-me-through` to match the manual clone path.
+
+```
+npx skills add skast96/walk-me-through-skill -g -a claude-code -y
+~/.claude/skills/walk-me-through/install.sh
+```
+
+Updates on every machine: `npx skills update -g`.
+
+### Path 2: git clone (fallback)
+
+For machines without Node, or when the CLI is not wanted:
+
 ```
 git clone git@github.com:skast96/walk-me-through-skill.git ~/.claude/skills/walk-me-through
 ~/.claude/skills/walk-me-through/install.sh
 ```
 
-`install.sh`:
+Updates: `git pull` in that directory.
 
+### Agent install block in the README
+
+The README carries a short block the user pastes into Claude Code on a new
+machine. Claude then performs the install itself. Wording along these lines:
+
+> Install the Claude Code skill from
+> https://github.com/skast96/walk-me-through-skill. Run
+> `npx skills add skast96/walk-me-through-skill -g -a claude-code -y`. If that
+> fails, git clone the repo to `~/.claude/skills/walk-me-through`. Then run
+> `~/.claude/skills/walk-me-through/install.sh`, show me its output, and
+> remind me to restart Claude Code.
+
+This block is the first thing under the README's install heading. The two
+manual paths follow it for people who prefer to run the commands themselves.
+
+### install.sh
+
+- Resolves its own directory through the symlink, since Path 1 installs a
+  symlink. Uses `readlink -f` on `$0`.
 - Checks for `uv`. Prints the uv install one-liner and exits if missing.
 - Runs `uv tool install edge-tts` if the `edge-tts` command is missing.
 - Checks for `mpv`. Prints the distro package hint and exits if missing.
@@ -210,6 +257,10 @@ be unit tested from a shell.
 - **Feedback edits the plan directly.** A separate notes file would need a
   second pass to apply. Editing directly keeps the plan the single source of
   truth for executors.
-- **Repository is the skill directory.** Enables clone-to-install on several
-  machines without a plugin marketplace. A marketplace plugin can be added
-  later if the skill is shared beyond one person.
+- **Repository is the skill directory, root `SKILL.md`.** This is the layout
+  the skills CLI discovers, and it also works with a plain git clone. No
+  plugin marketplace is needed for one person on several machines. A
+  marketplace plugin can be added later if the skill is shared more widely.
+- **skills CLI as primary install.** It is the current cross-agent standard
+  (agentskills.io) and gives one-command updates on every machine. Git clone
+  stays documented as the no-Node fallback.
