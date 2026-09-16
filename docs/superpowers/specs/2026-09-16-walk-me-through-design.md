@@ -65,8 +65,10 @@ Configuration:
 - `WALK_ME_THROUGH_RATE` passes through to edge-tts `--rate`. Default `+0%`.
 - Nothing else is configurable.
 
-Pressing `q` in mpv stops playback of the current section. The script still
-exits 0. The skill treats this as "skip the rest of this section".
+There is no way to skip a section while it plays. The skill runs the script
+through Claude's Bash tool, which has no terminal attached, so mpv keyboard
+input does not work. Sections are kept short instead. mpv gets
+`</dev/null` so it never waits on input.
 
 Temporary files go to `${TMPDIR:-/tmp}` via `mktemp`. The skill does not
 depend on the Claude Code scratchpad path.
@@ -209,7 +211,6 @@ manual paths follow it for people who prefer to run the commands themselves.
 | `edge-tts` not installed | `speak.sh` exits 1. Skill falls back to text. |
 | No network | `speak.sh` exits 1 after edge-tts fails. Skill falls back to text. |
 | `mpv` missing | `speak.sh` exits 1. Skill falls back to text. |
-| User presses `q` in mpv | Playback stops, exit 0. Skill asks the question as normal. |
 | Plan not in writing-plans format | Skill still splits on top-level headings and says the format is unfamiliar. |
 | No plan path and no plans directory | Skill asks for a path. |
 | Feedback contradicts an earlier comment | Skill asks which one wins before applying. |
