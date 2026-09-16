@@ -32,8 +32,8 @@ clone into the personal skills directory.
 ```
 ~/.claude/skills/walk-me-through/
   SKILL.md              the skill: trigger, flow, briefing rules
-  speak.sh              text on stdin -> edge-tts -> mpv
-  install.sh            installs edge-tts via uv, checks mpv and audio
+  speak.sh              text on stdin -> edge-tts or Kokoro -> mpv
+  install.sh            checks the configured engine, mpv and audio
   README.md             what it is, install, usage, voice override
   docs/superpowers/specs/   this document
   docs/superpowers/plans/   implementation plan
@@ -52,22 +52,45 @@ Contract:
 
 - Reads UTF-8 text from stdin.
 - Takes one optional argument, the output mp3 path.
-- Without the argument, renders with `edge-tts` to an mp3 in a temporary file.
+- Renders with the configured engine: `edge-tts` or a Kokoro-FastAPI server.
+  Without the argument, the mp3 goes to a temporary file.
 - With the argument, renders to that path, creating parent directories, and
   keeps the file. If the file already exists and is not empty, plays it as is
   and ignores stdin. A failed synthesis removes the partial file.
 - Plays the mp3 with `mpv --no-video --really-quiet`.
 - Blocks until playback ends. This is what makes the skill wait.
-- Exits 0 on success. Exits non-zero if `edge-tts` is missing, the network
-  call fails, or `mpv` is missing. It prints one short reason to stderr.
+- Exits 0 on success. Exits non-zero if the configured engine is missing or
+  unreachable, synthesis fails, or `mpv` is missing. It prints one short
+  reason to stderr. There is no fallback from one engine to the other. The
+  user chose the engine and must learn that it is not working, not hear a
+  different voice.
 - Deletes the temporary file afterwards.
 
 Configuration:
 
-- `WALK_ME_THROUGH_VOICE` selects the edge-tts voice. Default is
-  `en-US-AndrewMultilingualNeural`.
-- `WALK_ME_THROUGH_RATE` passes through to edge-tts `--rate`. Default `+0%`.
-- Nothing else is configurable.
+- `WALK_ME_THROUGH_TTS` selects the engine: `edge` (default) or `kokoro`.
+  Any other value is an error.
+- `WALK_ME_THROUGH_VOICE` selects the voice of the chosen engine. Default is
+  `en-US-AndrewMultilingualNeural` for edge and `af_heart` for kokoro.
+- `WALK_ME_THROUGH_RATE` is a whole percent such as `+10%`. edge-tts gets it
+  as `--rate`. Kokoro gets it converted to `speed`, so `+10%` becomes `1.10`.
+  A value that is not a whole percent is an error on the kokoro path.
+- `WALK_ME_THROUGH_KOKORO_URL` is the Kokoro-FastAPI base URL. Default
+  `http://localhost:8880`.
+- Nothing else is configurable. Configuration lives per machine in the `env`
+  block of `~/.claude/settings.json`, which Claude Code passes to every Bash
+  command. A file inside the skill directory was rejected: the skills CLI
+  installs a symlinked copy that `npx skills update` refreshes, so a per
+  machine file there would not survive.
+
+Kokoro path:
+
+- Presence check is `GET <url>/health` with a two second timeout.
+- Synthesis is `POST <url>/v1/audio/speech` with a JSON body of `model`,
+  `input`, `voice`, `response_format` mp3 and `speed`, written with `curl`
+  to the output path. The text is JSON escaped in bash: backslash, double
+  quote, newline, carriage return and tab.
+- Needs `curl`. Missing curl is an error with a reason.
 
 There is no way to skip a section while it plays. The skill runs the script
 through Claude's Bash tool, which has no terminal attached, so mpv keyboard
@@ -234,8 +257,11 @@ manual paths follow it for people who prefer to run the commands themselves.
 
 - Resolves its own directory through the symlink, since Path 1 installs a
   symlink. Uses `readlink -f` on `$0`.
-- Checks for `uv`. Prints the uv install one-liner and exits if missing.
-- Runs `uv tool install edge-tts` if the `edge-tts` command is missing.
+- Reads `WALK_ME_THROUGH_TTS` and checks only that engine.
+- For edge: checks for `uv` and prints the uv install one-liner if missing.
+  Runs `uv tool install edge-tts` if the `edge-tts` command is missing.
+- For kokoro: checks for `curl` and that `GET <url>/health` answers. Prints
+  the URL and exits if not.
 - Checks for `mpv`. Prints the distro package hint and exits if missing.
 - Speaks one test sentence so the user hears it works.
 - Reminds the user to restart Claude Code so the new skill is picked up.
@@ -246,6 +272,9 @@ manual paths follow it for people who prefer to run the commands themselves.
 |---|---|
 | `edge-tts` not installed | `speak.sh` exits 1. Skill falls back to text. |
 | No network | `speak.sh` exits 1 after edge-tts fails. Skill falls back to text. |
+| Kokoro chosen but not reachable | `speak.sh` exits 1 naming the URL. No switch to edge-tts. Skill falls back to text. |
+| Kokoro chosen, `curl` missing | `speak.sh` exits 1. Skill falls back to text. |
+| Unknown value in `WALK_ME_THROUGH_TTS` | `speak.sh` exits 1 naming the variable. Skill falls back to text. |
 | `mpv` missing | `speak.sh` exits 1. Skill falls back to text. |
 | Plan not in writing-plans format | Skill still splits on top-level headings and says the format is unfamiliar. |
 | No plan path and no plans directory | Skill asks for a path. |
@@ -267,6 +296,20 @@ manual paths follow it for people who prefer to run the commands themselves.
   temporary directory is empty.
 - With an output path that already exists and `PATH` stripped of `edge-tts`,
   the file is played and the exit code is 0.
+- With an unknown engine name, exit non-zero and the reason names the variable.
+- With kokoro chosen and no `curl` on `PATH`, exit non-zero with a reason.
+- With kokoro chosen and a fake `curl` whose health check fails, exit non-zero
+  naming the URL, and a fake `edge-tts` on `PATH` is never run.
+- With kokoro chosen and a fake `curl` that answers, the mp3 is written and
+  the request body carries the voice, the converted speed and the escaped text.
+
+`tests/test-install.sh`:
+
+- With `uv` missing, exit non-zero and the uv install hint is printed.
+- With `uv` and `edge-tts` present and `mpv` missing, exit non-zero with the
+  package hint.
+- With kokoro chosen and a fake `curl` that fails, exit non-zero naming the URL.
+- With an unknown engine name, exit non-zero naming the variable.
 
 Skill dry run against `tests/fixture-plan.md`:
 
@@ -298,6 +341,12 @@ be unit tested from a shell.
 - **edge-tts over piper and espeak-ng.** Natural voice, no key, one-line
   install. Cost: needs network while speaking. Acceptable because the
   fallback is text.
+- **Kokoro as a second, configured engine. No automatic fallback.** A local
+  Kokoro-FastAPI server is faster and works offline, but the user starts the
+  container by hand. Auto-detecting it and silently switching to edge-tts
+  when it is down was rejected: the user would hear a different voice and not
+  learn that the container stopped. The engine is chosen per machine and a
+  missing engine is an error the skill reports.
 - **Feedback edits the plan directly.** A separate notes file would need a
   second pass to apply. Editing directly keeps the plan the single source of
   truth for executors.

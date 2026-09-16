@@ -39,8 +39,9 @@ Update later with `git pull` in that directory.
 
 ### What install.sh does
 
-- Checks that `uv` is available and tells you how to get it if not.
-- Installs `edge-tts` as a uv tool.
+- Reads which speech engine you configured. See Speech engine below. Default is edge-tts.
+- For edge-tts: checks that `uv` is available and installs `edge-tts` as a uv tool.
+- For Kokoro: checks that `curl` is available and that the Kokoro server answers.
 - Checks that `mpv` is available and names the package if not.
 - Speaks one test sentence so you hear that audio works.
 
@@ -92,25 +93,46 @@ mpv docs/walk-me/2026-09-16-my-feature/
 
 The skill adds `docs/walk-me/` to the project's `.gitignore`, so the audio stays local. The next walkthrough of the same plan replaces the folder.
 
-## Voice
+## Speech engine
 
-Two environment variables, both optional. Set them in your shell profile.
+Two engines are supported. You pick one per machine. There is no fallback: if the chosen engine is not available, speaking fails with a message that names the problem and the walkthrough continues as text.
+
+- `edge`: Microsoft's online voices through edge-tts. Default. Needs network.
+- `kokoro`: a local Kokoro-FastAPI server, for example the FastKoko Docker container. Faster and offline.
+
+Four environment variables, all optional.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `WALK_ME_THROUGH_VOICE` | `en-US-AndrewMultilingualNeural` | An edge-tts voice name |
-| `WALK_ME_THROUGH_RATE` | `+0%` | Speech rate, for example `+15%` |
+| `WALK_ME_THROUGH_TTS` | `edge` | `edge` or `kokoro` |
+| `WALK_ME_THROUGH_VOICE` | `en-US-AndrewMultilingualNeural` for edge, `af_heart` for kokoro | A voice name of the chosen engine |
+| `WALK_ME_THROUGH_RATE` | `+0%` | Speech rate as a whole percent, for example `+15%`. Kokoro receives it as speed `1.15`. |
+| `WALK_ME_THROUGH_KOKORO_URL` | `http://localhost:8880` | Base URL of the Kokoro server |
 
-List voices with `edge-tts --list-voices`.
+Set them in the `env` block of `~/.claude/settings.json`. Claude Code passes that block to every command it runs, on every project, so the skill sees it wherever it is invoked:
+
+```json
+{
+  "env": {
+    "WALK_ME_THROUGH_TTS": "kokoro",
+    "WALK_ME_THROUGH_VOICE": "am_adam"
+  }
+}
+```
+
+Run `install.sh` again after changing the engine. It checks the new engine and speaks a test sentence.
+
+List edge-tts voices with `edge-tts --list-voices`. List Kokoro voices with `curl http://localhost:8880/v1/audio/voices`. Kokoro also takes mixes such as `af_bella(2)+af_sky(1)`.
 
 ## Requirements
 
 - Claude Code
-- `uv` for installing edge-tts
 - Node with npx for the skills CLI install path. The git path does not need it.
 - `mpv` for playback
-- Network access while speaking. edge-tts uses Microsoft's online voices.
-  Without network the walkthrough falls back to text.
+- For the edge engine: `uv` for installing edge-tts, and network access while speaking.
+  edge-tts uses Microsoft's online voices. Without network the walkthrough falls back to text.
+- For the kokoro engine: `curl`, and a running Kokoro-FastAPI server such as
+  [FastKoko](https://github.com/remsky/Kokoro-FastAPI). The server is not started by this skill.
 
 ## Layout
 

@@ -6,6 +6,9 @@ set -u
 here=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
 install="$here/../install.sh"
 failed=0
+# The tests below assume the edge engine unless they set WALK_ME_THROUGH_TTS themselves.
+export WALK_ME_THROUGH_TTS=edge
+unset WALK_ME_THROUGH_KOKORO_URL
 
 pass() { echo "PASS: $1"; }
 fail() { echo "FAIL: $1"; failed=1; }
@@ -46,5 +49,28 @@ if command -v uv >/dev/null 2>&1 && command -v edge-tts >/dev/null 2>&1; then
 else
   skip "missing mpv test needs uv and edge-tts installed"
 fi
+
+# Test 3: kokoro chosen, server unreachable -> exit 1, prints the URL. Fake curl that always fails.
+bin=$(mktemp -d)
+make_bin "$bin" "${base[@]}"
+printf '#!/usr/bin/env bash\nexit 7\n' > "$bin/curl"; chmod +x "$bin/curl"
+err=$(WALK_ME_THROUGH_TTS=kokoro WALK_ME_THROUGH_KOKORO_URL="http://fake:8880" PATH="$bin" bash "$install" 2>&1 >/dev/null); rc=$?
+if [ $rc -ne 0 ] && [[ "$err" == *"Kokoro is not reachable at http://fake:8880"* ]]; then
+  pass "unreachable kokoro exits non-zero with the URL"
+else
+  fail "unreachable kokoro: rc=$rc stderr=$err"
+fi
+rm -rf "$bin"
+
+# Test 4: unknown engine -> exit 1, names the variable
+bin=$(mktemp -d)
+make_bin "$bin" "${base[@]}"
+err=$(WALK_ME_THROUGH_TTS=bogus PATH="$bin" bash "$install" 2>&1 >/dev/null); rc=$?
+if [ $rc -ne 0 ] && [[ "$err" == *"WALK_ME_THROUGH_TTS is 'bogus'"* ]]; then
+  pass "unknown engine exits non-zero with reason"
+else
+  fail "unknown engine: rc=$rc stderr=$err"
+fi
+rm -rf "$bin"
 
 exit $failed
