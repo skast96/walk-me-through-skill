@@ -58,12 +58,14 @@ In a Claude Code session, in a project that has a plan:
 
 Without a path the skill takes the newest file in `docs/superpowers/plans/`.
 
-Claude speaks the plan in four to eight sections. After each one you get a prompt with these choices:
+Claude speaks the plan in four to eight sections. The text of each briefing is printed in the session while it plays, so you can read along. After each one you get a prompt with these choices:
 
 - Continue
 - Repeat
 - Go deeper
 - A free text field for your comments
+
+When you type a comment, Claude answers out loud and in text, like a colleague would. If it disagrees, it pushes back once with a reason and a question. Your answer after that is final and gets recorded.
 
 At the end Claude does three things:
 
@@ -80,11 +82,15 @@ Every briefing is saved as an audio file in the project, next to a transcript. T
 ```
 docs/walk-me/2026-09-16-my-feature/
   01-overview.mp3
+  01b-overview-reply.mp3
   02-constraints.mp3
   03-csv-formatter.mp3
+  03b-csv-formatter-deeper.mp3
   ...
   transcript.md
 ```
+
+Replies to your comments and Go deeper briefings get a letter after the section number, in the order they happened. The transcript holds every briefing and every reply, with your comments quoted above the replies.
 
 Replay the whole walkthrough in order with any player, for example:
 
