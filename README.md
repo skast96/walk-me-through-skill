@@ -65,6 +65,8 @@ Claude speaks the plan in four to eight sections. After each one you get a promp
 - Go deeper
 - A free text field for your comments
 
+When you type a comment, Claude answers out loud, like a colleague would. If it disagrees, it pushes back once with a reason and a question. Your answer after that is final and gets recorded.
+
 At the end Claude does three things:
 
 - It summarizes your comments.
@@ -80,11 +82,15 @@ Every briefing is saved as an audio file in the project, next to a transcript. T
 ```
 docs/walk-me/2026-09-16-my-feature/
   01-overview.mp3
+  01b-overview-reply.mp3
   02-constraints.mp3
   03-csv-formatter.mp3
+  03b-csv-formatter-deeper.mp3
   ...
   transcript.md
 ```
+
+Replies to your comments and Go deeper briefings get a letter after the section number, in the order they happened. The transcript holds every briefing and every reply, with your comments quoted above the replies.
 
 Replay the whole walkthrough in order with any player, for example:
 

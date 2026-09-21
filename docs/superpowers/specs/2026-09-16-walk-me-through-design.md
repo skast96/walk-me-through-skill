@@ -173,18 +173,23 @@ There is no automatic offer after writing-plans and no matching on phrases.
      lists none. Claude names what it is least sure about.
 3. For each section:
    - Write the spoken briefing following the register rules below.
-   - Pipe it to `speak.sh`.
-   - If `speak.sh` fails, print the briefing as text and continue. Say once,
-     in text, that audio is off for this walkthrough.
+   - Speak it. Speaking always means two steps in this order: append the
+     text to the transcript, then pipe it to `speak.sh`. Spoken text is not
+     printed in the session. It is already in the transcript, and printing
+     it twice costs tokens.
+   - If `speak.sh` fails, print the text instead and continue. Say once, in
+     text, that audio is off for this walkthrough. The transcript continues
+     for every text.
    - Ask the user with `AskUserQuestion`. Options: Continue, Repeat, Go
      deeper. The built-in Other field is where comments are typed.
    - "Go deeper" speaks a second briefing about the same section with more
      detail on the steps and interfaces, then asks again.
-   - A typed comment is recorded together with the section it belongs to.
-     If the comment is ambiguous, ask one typed clarification. Then confirm
-     what was recorded and ask the same question again.
+   - A typed comment gets a spoken reply following the reply rules below.
+     Once the point is settled, the comment is recorded together with the
+     section it belongs to and the outcome of the exchange. Then the same
+     question is asked again.
    - Only an explicit Continue moves to the next section. A comment, a
-     clarification, or a summary never does.
+     reply, or a clarification never does.
 4. Wrap-up:
    - Speak a short summary of every change the user asked for. If there were
      none, say so and stop.
@@ -208,6 +213,20 @@ There is no automatic offer after writing-plans and no matching on phrases.
   where the listener's input is most valuable.
 - No filler openers and no praise of the plan.
 
+### Reply rules
+
+A reply is what Claude says when the user comments. It is spoken like a
+briefing and follows the same register, except that it need not end on a
+question and stays under 80 words. Its parts, in order:
+
+1. Claude's position: agree, disagree, or a question it needs answered first.
+   The question case covers an ambiguous comment and a comment that
+   contradicts an earlier one.
+2. If it disagrees: one concrete reason and one question that would settle
+   it. Claude pushes back once per point. The user's answer after that is
+   final.
+3. What was recorded, in one sentence, once the point is settled.
+
 ### Saved audio
 
 Every briefing is kept as an mp3 in the project so the user can replay the
@@ -228,12 +247,16 @@ walkthrough with any player and without Claude.
   - one file per task section
   - `NN-risks.mp3`
   - `NN-wrap-up.mp3`
-- A Go deeper briefing is `NNb-<name>-deeper.mp3`.
+- Extra audio within a section gets a letter suffix after the number, in the
+  order it happened, starting at `b`. The last word names the kind:
+  `NNb-<name>-reply.mp3`, `NNc-<name>-deeper.mp3`. Directory playback then
+  follows the conversation.
 - Repeat runs the same speak command. The file exists, so speak.sh replays it
   without synthesis.
-- `transcript.md` in the folder holds every briefing under a heading with its
-  file name. It is written in text mode too, with the names the audio would
-  have had.
+- `transcript.md` in the folder holds every briefing and every reply under a
+  heading with its file name. A reply entry quotes the user's comment above
+  the reply. Each entry is appended before its speak call. The transcript is
+  written in text mode too, with the names the audio would have had.
 - At the end the skill names the folder and the replay command
   `mpv <folder>/`.
 

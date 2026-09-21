@@ -1,15 +1,17 @@
 ---
 name: walk-me-through
-description: Spoken, section-by-section walkthrough of a superpowers implementation plan in a colleague's voice. Pauses for typed feedback after each section and applies the feedback to the plan file.
+description: Spoken, section-by-section walkthrough of a superpowers implementation plan in a colleague's voice. Pauses for typed feedback after each section, talks back, and applies the feedback to the plan file.
 argument-hint: [plan-path]
 disable-model-invocation: true
 ---
 
 # Walk Me Through
 
-Explain an implementation plan out loud the way a colleague briefs a teammate before starting work. Speak one section, stop, collect typed feedback, move on. At the end, apply the feedback to the plan file.
+Explain an implementation plan out loud the way a colleague briefs a teammate before starting work. Speak one section, stop, collect typed feedback, answer it out loud, move on. At the end, apply the feedback to the plan file.
 
 This is not read-aloud. Never speak plan text verbatim. Write a spoken briefing for each section and speak that.
+
+Everything you say during the walkthrough is spoken. Briefings, replies to comments, clarifying questions, and the wrap up all go through the same two steps below. Do not also print spoken text in the session. It lands in the transcript, and printing it twice costs tokens. The only text that is not spoken is bookkeeping: the section list, the AskUserQuestion prompt, the audio-off notice, and the final summary of plan edits.
 
 ## Speaking
 
@@ -19,7 +21,10 @@ The speech engine is configured per machine. Two of the engines run in a Docker 
 - If it exits non-zero, audio is unavailable for this walkthrough. Follow the three text mode steps below, quoting its stderr line as the reason.
 - The last step of every walkthrough, text mode included, is `"${CLAUDE_SKILL_DIR}/engine.sh" stop`.
 
-Speak a briefing by piping it into the speak script, with the path it should be saved under, without extension. Use a Bash timeout of 300000 so long sections finish:
+Speaking a text always means two steps, in this order:
+
+1. Append it to the transcript. See Saved audio for the format.
+2. Pipe it into the speak script, with the path it should be saved under, without extension. Use a Bash timeout of 300000 so long sections finish:
 
 ```bash
 cat <<'BRIEFING' | "${CLAUDE_SKILL_DIR}/speak.sh" docs/walk-me/<plan-basename>/<NN-name>
@@ -27,13 +32,15 @@ cat <<'BRIEFING' | "${CLAUDE_SKILL_DIR}/speak.sh" docs/walk-me/<plan-basename>/<
 BRIEFING
 ```
 
+Step 1 comes before step 2 because the speak script blocks until playback ends. The transcript is complete even if playback fails.
+
 The script appends `.mp3`, or `.wav` with the pocket engine, writes the audio there, keeps it, and blocks until playback ends. If that file already exists and is not empty, the script plays it as is and ignores the text. That is how Repeat works without a second synthesis.
 
 If the speak script exits non-zero, audio is unavailable for this walkthrough. Then do three things:
 
-- Print the briefing as text instead.
+- Print the text in the session instead.
 - Tell the user once that audio is off, quoting the script's stderr line as the reason.
-- Continue in text mode for every remaining section. Do not retry audio. Keep writing the transcript.
+- Skip step 2 for every remaining text and print each one instead. Do not retry audio. Step 1 still happens for every text.
 
 ## Saved audio
 
@@ -49,8 +56,11 @@ Every walkthrough leaves its audio in the project so the user can listen again w
   - `03-csv-formatter.mp3` and one more per task section
   - `NN-risks.mp3`
   - `NN-wrap-up.mp3`
-- A Go deeper briefing sits next to its section with a `b` suffix: `03b-csv-formatter-deeper.mp3`.
-- Transcript: `transcript.md` in the same folder. After each briefing append a heading with the file name without its extension and the briefing text below it. In text mode the transcript is still written, with the file names the audio would have had.
+- Extra audio within a section gets a letter suffix after the number, in the order it happened, starting at `b`. Directory playback then follows the conversation. The last word says what it is: `deeper` for a Go deeper briefing, `reply` for an answer to a comment. For example:
+  - `03b-csv-formatter-reply.mp3`
+  - `03c-csv-formatter-deeper.mp3`
+  - `03d-csv-formatter-reply.mp3`
+- Transcript: `transcript.md` in the same folder. Before each speak call append a heading with the file name without its extension and the text below it. For a reply, put the user's comment first as a quoted line, then the reply. In text mode the transcript is still written, with the file names the audio would have had.
 - At the end, tell the user the folder path in one line and that `mpv <folder>/` replays it in order.
 
 ## Procedure
@@ -80,20 +90,18 @@ Print the section list as a short numbered list before speaking, so the user kno
 
 For every section:
 
-Only an explicit Continue moves to the next section. Never move on after a comment, a clarification, or a summary of the discussion. Ask again instead.
+Only an explicit Continue moves to the next section. Never move on after a comment, a reply, or a clarification. Ask again instead.
 
 1. Write the briefing following the register rules below.
-2. Speak it into its numbered file and append it to the transcript.
+2. Speak it into its numbered file. Speaking includes appending it to the transcript.
 3. Ask with AskUserQuestion. Question: "Any thoughts on this part?" Options, in this order:
    - **Continue** - the user is finished with this section. Move to the next one.
    - **Repeat** - run the same speak command again. The file exists, so it is replayed. Then ask again.
-   - **Go deeper** - write and speak a second briefing on the same section into its `b` file, up to 250 words, covering the individual steps, the interfaces, and what the tests check. Then ask again.
+   - **Go deeper** - write and speak a second briefing on the same section into the section's next lettered file, up to 250 words, covering the individual steps, the interfaces, and what the tests check. Then ask again.
    - The built in Other field is where the user types comments.
 4. When the user types a comment:
-   - Record it together with the section and the task it belongs to.
-   - If the comment could mean two different changes, ask one typed clarification. Do not speak the clarification.
-   - If it contradicts an earlier comment, ask which one wins.
-   - Confirm in one or two text sentences what you recorded.
+   - Write a reply following the reply rules below. Speak it into the section's next lettered `reply` file. Speaking includes appending it, with the comment, to the transcript.
+   - Once the point is settled, record the comment together with the section, the task it belongs to, and the outcome of the exchange. "Switch to an in memory export because the table is capped at fifty thousand rows" is a recorded comment. "Switch to an in memory export" alone loses the reason.
    - Then ask the same question again. The user may have more to say about this section.
 
 ### 4. Wrap up
@@ -121,8 +129,37 @@ Only an explicit Continue moves to the next section. Never move on after a comme
 - No filler openers, no praise of the plan, no "great question".
 - One idea per sentence. Short sentences read better aloud.
 
+## Reply rules
+
+A reply is what you say when the user comments. It is a colleague answering, not a clerk taking notes. It follows the register rules above, except that it need not end on a question, and stays under 80 words. A reply has these parts, in this order:
+
+1. **Your position.** One of three openings:
+   - You agree. Say so and say what you are recording.
+   - You disagree. Say so.
+   - You need something first. The comment could mean two different changes, or it contradicts an earlier comment. Name the two readings, or both comments, and ask which one the user means.
+2. **If you disagree:** one concrete reason from the plan or the spec, then one question whose answer would settle it. Push back once per point. When the user answers, or repeats the request, their decision is final. Say that you are recording it, and record it.
+3. **What you recorded**, in one sentence, once the point is settled.
+
+The example below shows all three parts across one exchange.
+
 ## Example briefing
 
 For the overview of a plan that adds CSV export by streaming:
 
 > I want to add a C S V export of the orders table to the admin dashboard. My plan splits it into three parts. A small formatting function that turns order rows into C S V text, a web endpoint that streams that text as a download, and a button on the dashboard. I chose streaming over building the whole file in memory because the table has two million rows and I do not want a request to hold all of that. The part I am least sure about is the batch size for streaming. I picked one thousand rows per batch without measuring. Does streaming match what you had in mind, or would you rather export in the background and email a link?
+
+## Example reply
+
+The user types: "Streaming is overkill. Just build the file in memory, it's simpler."
+
+First reply, spoken into `01b-overview-reply.mp3`:
+
+> I want to push back once. The orders table has two million rows. Built in memory that is a few hundred megabytes per request, and two admins exporting at once could take the service down. Streaming costs about thirty extra lines. If the table stays small, in memory is fine and I will switch. Does it stay small?
+
+The user types: "It's capped at fifty thousand rows."
+
+Second reply, spoken into `01c-overview-reply.mp3`:
+
+> Then you are right. At fifty thousand rows the memory argument is gone and streaming is only complexity. I am recording the switch to an in memory export because the table is capped at fifty thousand rows.
+
+Had the user typed "I don't care, do it in memory" instead, the second reply would record the switch without another argument.
