@@ -173,11 +173,13 @@ There is no automatic offer after writing-plans and no matching on phrases.
      lists none. Claude names what it is least sure about.
 3. For each section:
    - Write the spoken briefing following the register rules below.
-   - Speak it. Speaking always means three steps in this order: print the
-     text in the session, append it to the transcript, pipe it to
-     `speak.sh`. The user reads along while the audio plays.
-   - If `speak.sh` fails, say once, in text, that audio is off for this
-     walkthrough. Printing and the transcript continue for every text.
+   - Speak it. Speaking always means two steps in this order: append the
+     text to the transcript, then pipe it to `speak.sh`. Spoken text is not
+     printed in the session. It is already in the transcript, and printing
+     it twice costs tokens.
+   - If `speak.sh` fails, print the text instead and continue. Say once, in
+     text, that audio is off for this walkthrough. The transcript continues
+     for every text.
    - Ask the user with `AskUserQuestion`. Options: Continue, Repeat, Go
      deeper. The built-in Other field is where comments are typed.
    - "Go deeper" speaks a second briefing about the same section with more

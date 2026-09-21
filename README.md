@@ -58,14 +58,14 @@ In a Claude Code session, in a project that has a plan:
 
 Without a path the skill takes the newest file in `docs/superpowers/plans/`.
 
-Claude speaks the plan in four to eight sections. The text of each briefing is printed in the session while it plays, so you can read along. After each one you get a prompt with these choices:
+Claude speaks the plan in four to eight sections. After each one you get a prompt with these choices:
 
 - Continue
 - Repeat
 - Go deeper
 - A free text field for your comments
 
-When you type a comment, Claude answers out loud and in text, like a colleague would. If it disagrees, it pushes back once with a reason and a question. Your answer after that is final and gets recorded.
+When you type a comment, Claude answers out loud, like a colleague would. If it disagrees, it pushes back once with a reason and a question. Your answer after that is final and gets recorded.
 
 At the end Claude does three things:
 

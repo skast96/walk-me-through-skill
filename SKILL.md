@@ -11,21 +11,20 @@ Explain an implementation plan out loud the way a colleague briefs a teammate be
 
 This is not read-aloud. Never speak plan text verbatim. Write a spoken briefing for each section and speak that.
 
-Everything you say during the walkthrough is both printed and spoken. Briefings, replies to comments, clarifying questions, and the wrap up all go through the same three steps below. The only text that is not spoken is bookkeeping: the section list, the AskUserQuestion prompt, the audio-off notice, and the final summary of plan edits.
+Everything you say during the walkthrough is spoken. Briefings, replies to comments, clarifying questions, and the wrap up all go through the same two steps below. Do not also print spoken text in the session. It lands in the transcript, and printing it twice costs tokens. The only text that is not spoken is bookkeeping: the section list, the AskUserQuestion prompt, the audio-off notice, and the final summary of plan edits.
 
 ## Speaking
 
 The speech engine is configured per machine. Two of the engines run in a Docker container that this skill starts and stops:
 
 - Before the first section, run `"${CLAUDE_SKILL_DIR}/engine.sh" start` with a Bash timeout of 600000. The script gives up after five minutes on its own, so the longer tool timeout lets its message through. With the default engine it returns at once. Otherwise it starts the container and waits until the engine answers.
-- If it exits non-zero, audio is unavailable for this walkthrough. Follow the two text mode steps below, quoting its stderr line as the reason.
+- If it exits non-zero, audio is unavailable for this walkthrough. Follow the three text mode steps below, quoting its stderr line as the reason.
 - The last step of every walkthrough, text mode included, is `"${CLAUDE_SKILL_DIR}/engine.sh" stop`.
 
-Speaking a text always means three steps, in this order:
+Speaking a text always means two steps, in this order:
 
-1. Print the text in the session as a plain paragraph, so the user can read along.
-2. Append it to the transcript. See Saved audio for the format.
-3. Pipe it into the speak script, with the path it should be saved under, without extension. Use a Bash timeout of 300000 so long sections finish:
+1. Append it to the transcript. See Saved audio for the format.
+2. Pipe it into the speak script, with the path it should be saved under, without extension. Use a Bash timeout of 300000 so long sections finish:
 
 ```bash
 cat <<'BRIEFING' | "${CLAUDE_SKILL_DIR}/speak.sh" docs/walk-me/<plan-basename>/<NN-name>
@@ -33,14 +32,15 @@ cat <<'BRIEFING' | "${CLAUDE_SKILL_DIR}/speak.sh" docs/walk-me/<plan-basename>/<
 BRIEFING
 ```
 
-Steps 1 and 2 come before step 3 because the speak script blocks until playback ends. The user reads while listening, and the transcript is complete even if playback fails.
+Step 1 comes before step 2 because the speak script blocks until playback ends. The transcript is complete even if playback fails.
 
 The script appends `.mp3`, or `.wav` with the pocket engine, writes the audio there, keeps it, and blocks until playback ends. If that file already exists and is not empty, the script plays it as is and ignores the text. That is how Repeat works without a second synthesis.
 
-If the speak script exits non-zero, audio is unavailable for this walkthrough. Then do two things:
+If the speak script exits non-zero, audio is unavailable for this walkthrough. Then do three things:
 
+- Print the text in the session instead.
 - Tell the user once that audio is off, quoting the script's stderr line as the reason.
-- Skip step 3 for every remaining text. Do not retry audio. Steps 1 and 2 still happen for every text.
+- Skip step 2 for every remaining text and print each one instead. Do not retry audio. Step 1 still happens for every text.
 
 ## Saved audio
 
@@ -93,14 +93,14 @@ For every section:
 Only an explicit Continue moves to the next section. Never move on after a comment, a reply, or a clarification. Ask again instead.
 
 1. Write the briefing following the register rules below.
-2. Speak it into its numbered file. Speaking includes printing it and appending it to the transcript.
+2. Speak it into its numbered file. Speaking includes appending it to the transcript.
 3. Ask with AskUserQuestion. Question: "Any thoughts on this part?" Options, in this order:
    - **Continue** - the user is finished with this section. Move to the next one.
    - **Repeat** - run the same speak command again. The file exists, so it is replayed. Then ask again.
    - **Go deeper** - write and speak a second briefing on the same section into the section's next lettered file, up to 250 words, covering the individual steps, the interfaces, and what the tests check. Then ask again.
    - The built in Other field is where the user types comments.
 4. When the user types a comment:
-   - Write a reply following the reply rules below. Speak it into the section's next lettered `reply` file. Speaking includes printing it and appending it, with the comment, to the transcript.
+   - Write a reply following the reply rules below. Speak it into the section's next lettered `reply` file. Speaking includes appending it, with the comment, to the transcript.
    - Once the point is settled, record the comment together with the section, the task it belongs to, and the outcome of the exchange. "Switch to an in memory export because the table is capped at fifty thousand rows" is a recorded comment. "Switch to an in memory export" alone loses the reason.
    - Then ask the same question again. The user may have more to say about this section.
 
