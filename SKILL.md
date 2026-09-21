@@ -13,17 +13,23 @@ This is not read-aloud. Never speak plan text verbatim. Write a spoken briefing 
 
 ## Speaking
 
-Speak a briefing by piping it into the speak script, with the file it should be saved as. Use a Bash timeout of 300000 so long sections finish:
+The speech engine is configured per machine. Two of the engines run in a Docker container that this skill starts and stops:
+
+- Before the first section, run `"${CLAUDE_SKILL_DIR}/engine.sh" start` with a Bash timeout of 600000. The script gives up after five minutes on its own, so the longer tool timeout lets its message through. With the default engine it returns at once. Otherwise it starts the container and waits until the engine answers.
+- If it exits non-zero, audio is unavailable for this walkthrough. Follow the three text mode steps below, quoting its stderr line as the reason.
+- The last step of every walkthrough, text mode included, is `"${CLAUDE_SKILL_DIR}/engine.sh" stop`.
+
+Speak a briefing by piping it into the speak script, with the path it should be saved under, without extension. Use a Bash timeout of 300000 so long sections finish:
 
 ```bash
-cat <<'BRIEFING' | "${CLAUDE_SKILL_DIR}/speak.sh" docs/walk-me/<plan-basename>/<NN-name>.mp3
+cat <<'BRIEFING' | "${CLAUDE_SKILL_DIR}/speak.sh" docs/walk-me/<plan-basename>/<NN-name>
 <briefing text>
 BRIEFING
 ```
 
-The script writes the mp3 to that path, keeps it, and blocks until playback ends. If the file already exists and is not empty, the script plays it as is and ignores the text. That is how Repeat works without a second synthesis.
+The script appends `.mp3`, or `.wav` with the pocket engine, writes the audio there, keeps it, and blocks until playback ends. If that file already exists and is not empty, the script plays it as is and ignores the text. That is how Repeat works without a second synthesis.
 
-If the script exits non-zero, audio is unavailable for this walkthrough. Then do three things:
+If the speak script exits non-zero, audio is unavailable for this walkthrough. Then do three things:
 
 - Print the briefing as text instead.
 - Tell the user once that audio is off, quoting the script's stderr line as the reason.
@@ -37,14 +43,14 @@ Every walkthrough leaves its audio in the project so the user can listen again w
 - If the basename is empty or still contains a `/` or `..`, stop and ask the user for a folder name. Never remove anything outside `docs/walk-me/`.
 - Before the first section: remove that folder if it exists. Then create it. A new walkthrough replaces the old audio.
 - Before the first section: make sure the project's `.gitignore` contains a line `docs/walk-me/`. Append it if missing. Create `.gitignore` if the project has none. Say in text that you did so.
-- File names have three parts: a two digit number in playback order, a hyphen, and a short lowercase name of the section with hyphens between words. Examples in order:
+- File names have three parts: a two digit number in playback order, a hyphen, and a short lowercase name of the section with hyphens between words. The extension is `.mp3`, or `.wav` with the pocket engine. Examples in order:
   - `01-overview.mp3`
   - `02-constraints.mp3`
   - `03-csv-formatter.mp3` and one more per task section
   - `NN-risks.mp3`
   - `NN-wrap-up.mp3`
 - A Go deeper briefing sits next to its section with a `b` suffix: `03b-csv-formatter-deeper.mp3`.
-- Transcript: `transcript.md` in the same folder. After each briefing append a heading with the mp3 file name and the briefing text below it. In text mode the transcript is still written, with the file names the audio would have had.
+- Transcript: `transcript.md` in the same folder. After each briefing append a heading with the file name without its extension and the briefing text below it. In text mode the transcript is still written, with the file names the audio would have had.
 - At the end, tell the user the folder path in one line and that `mpv <folder>/` replays it in order.
 
 ## Procedure
@@ -92,7 +98,7 @@ Only an explicit Continue moves to the next section. Never move on after a comme
 
 ### 4. Wrap up
 
-1. If there were no comments, speak one sentence saying so into the wrap up file, name the audio folder, and stop.
+1. If there were no comments, speak one sentence saying so into the wrap up file, name the audio folder, and skip to the last step.
 2. Otherwise write and speak a wrap up briefing into the wrap up file: every change the user asked for, one sentence each, in plan order. Under 150 words.
 3. Edit the plan file:
    - Keep the writing-plans structure: task headers, Files, Interfaces, checkbox steps.
@@ -101,6 +107,7 @@ Only an explicit Continue moves to the next section. Never move on after a comme
    - If a comment changes the design rather than the plan, apply the plan side and add a note in your text summary that the spec needs the same change. Never edit the spec.
 4. Print a text summary of what changed, section by section, and name the audio folder.
 5. If a change invalidates other tasks, for example a removed interface that three later tasks consume, say so in text and recommend rerunning writing-plans instead of patching.
+6. Run `"${CLAUDE_SKILL_DIR}/engine.sh" stop`. Do this also when audio was off.
 
 ## Register rules for briefings
 
